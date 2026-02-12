@@ -25,10 +25,10 @@ async function pushMessage(
 }
 
 serve(async (req: Request) => {
-  // Cron / 手動実行のみ許可（service_role_key検証）
+  // Cron / 手動実行のみ許可（CRON_SECRET検証）
   const authHeader = req.headers.get('Authorization');
-  const expectedToken = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!authHeader || !expectedToken || authHeader !== `Bearer ${expectedToken}`) {
+  const cronSecret = Deno.env.get('CRON_SECRET');
+  if (!authHeader || !cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return new Response('Unauthorized', { status: 401 });
   }
 
