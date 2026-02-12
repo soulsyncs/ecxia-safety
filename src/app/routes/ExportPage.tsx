@@ -1,0 +1,160 @@
+import { useState } from 'react';
+import { Download, FileText, ClipboardCheck, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { reportService, driverService } from '@/lib/demo-store';
+
+type ExportType = 'pre_work' | 'post_work' | 'inspection' | 'accident';
+
+const exportItems: { type: ExportType; label: string; icon: React.ElementType; description: string }[] = [
+  { type: 'pre_work', label: '業務前報告', icon: FileText, description: '出勤打刻・アルコールチェック・点呼記録' },
+  { type: 'post_work', label: '業務後報告', icon: FileText, description: '退勤打刻・走行距離・道路状況' },
+  { type: 'inspection', label: '日常点検', icon: ClipboardCheck, description: '車両13項目日常点検記録' },
+  { type: 'accident', label: '事故報告', icon: AlertTriangle, description: '事故の記録・原因・再発防止策' },
+];
+
+/** H-5: CSVフィールドのエスケープ（インジェクション防止） */
+function escapeCsv(value: string | number | boolean | null | undefined): string {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  // 数式インジェクション防止
+  if (/^[=+\-@\t\r]/.test(str)) {
+    return `"'${str.replace(/"/g, '""')}"`;
+  }
+  // カンマ・改行・ダブルクォートを含む場合はエスケープ
+  if (/[,"\n\r]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+export function ExportPage() {
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date(); d.setMonth(d.getMonth() - 1);
+    return d.toISOString().split('T')[0]!;
+  });
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]!);
+  const [exporting, setExporting] = useState<ExportType | null>(null);
+
+  const handleExport = async (type: ExportType) => {
+    setExporting(type);
+    // デモ: CSVを生成してダウンロード
+    await new Promise(r => setTimeout(r, 800));
+
+    const drivers = await driverService.list();
+    const driverMap = new Map(drivers.map(d => [d.id, d.name]));
+    let csv = '';
+    let filename = '';
+
+    if (type === 'pre_work') {
+      const reports = await reportService.getPreWorkReports();
+      const filtered = reports.filter(r => r.reportDate >= startDate && r.reportDate <= endDate);
+      csv = '日付,ドライバー,出勤時刻,アルコール結果,測定値,確認者,体調,疲労度,睡眠時間,提出方法\n';
+      for (const r of filtered) {
+        csv += [r.reportDate, escapeCsv(driverMap.get(r.driverId)), r.clockInAt, r.alcoholCheckResult, r.alcoholCheckValue ?? '', escapeCsv(r.alcoholCheckerName), r.healthCondition, r.fatigueLevel, r.sleepHours ?? '', r.submittedVia].join(',') + '\n';
+      }
+      filename = `業務前報告_${startDate}_${endDate}.csv`;
+    } else if (type === 'post_work') {
+      const reports = await reportService.getPostWorkReports();
+      const filtered = reports.filter(r => r.reportDate >= startDate && r.reportDate <= endDate);
+      csv = '日付,ドライバー,退勤時刻,走行距離km,配送数,アルコール結果,道路状況\n';
+      for (const r of filtered) {
+        csv += [r.reportDate, escapeCsv(driverMap.get(r.driverId)), r.clockOutAt, r.distanceKm, r.cargoDeliveredCount ?? '', r.alcoholCheckResult, escapeCsv(r.roadConditionNote)].join(',') + '\n';
+      }
+      filename = `業務後報告_${startDate}_${endDate}.csv`;
+    } else if (type === 'inspection') {
+      const reports = await reportService.getDailyInspections();
+      const filtered = reports.filter(r => r.inspectionDate >= startDate && r.inspectionDate <= endDate);
+      csv = '日付,ドライバー,全項目合格,異常メモ\n';
+      for (const r of filtered) {
+        csv += [r.inspectionDate, escapeCsv(driverMap.get(r.driverId)), r.allPassed ? 'OK' : 'NG', escapeCsv(r.abnormalityNote)].join(',') + '\n';
+      }
+      filename = `日常点検_${startDate}_${endDate}.csv`;
+    } else {
+      const reports = await reportService.getAccidentReports();
+      csv = '発生日時,ドライバー,場所,概要,原因,再発防止策,負傷者,重大事故,状態\n';
+      for (const r of reports) {
+        csv += [r.occurredAt, escapeCsv(driverMap.get(r.driverId)), escapeCsv(r.location), escapeCsv(r.summary), escapeCsv(r.cause), escapeCsv(r.preventionMeasures), r.hasInjuries, r.isSerious, r.status].join(',') + '\n';
+      }
+      filename = `事故報告_全件.csv`;
+    }
+
+    // BOMつきUTF-8でダウンロード
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    setExporting(null);
+  };
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">データエクスポート</h1>
+        <p className="text-muted-foreground">監査対応用のCSVデータをダウンロード</p>
+      </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-lg">期間指定</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4">
+            <div className="space-y-1">
+              <Label>開始日</Label>
+              <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            </div>
+            <span className="mt-6">〜</span>
+            <div className="space-y-1">
+              <Label>終了日</Label>
+              <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {exportItems.map(item => (
+          <Card key={item.type}>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <item.icon className="h-5 w-5 text-primary" />
+                <div>
+                  <CardTitle className="text-base">{item.label}</CardTitle>
+                  <CardDescription>{item.description}</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button
+                onClick={() => handleExport(item.type)}
+                disabled={exporting !== null}
+                className="w-full"
+                variant="outline"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {exporting === item.type ? 'エクスポート中...' : 'CSVダウンロード'}
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="mt-6">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Badge variant="outline">法令対応</Badge>
+            <span>業務記録・点呼記録は1年間、事故記録は3年間の保存が義務付けられています</span>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

@@ -1,0 +1,125 @@
+import { createRouter, createRoute, createRootRoute, redirect } from '@tanstack/react-router';
+import { RootLayout } from '@/app/layouts/RootLayout';
+import { AdminLayout } from '@/app/layouts/AdminLayout';
+import { LiffLayout } from '@/liff/layouts/LiffLayout';
+import { LoginPage } from '@/app/routes/LoginPage';
+import { DashboardPage } from '@/app/routes/DashboardPage';
+import { DriversPage } from '@/app/routes/DriversPage';
+import { VehiclesPage } from '@/app/routes/VehiclesPage';
+import { ReportsPage } from '@/app/routes/ReportsPage';
+import { ExportPage } from '@/app/routes/ExportPage';
+import { PreWorkFormPage } from '@/liff/pages/PreWorkFormPage';
+import { InspectionFormPage } from '@/liff/pages/InspectionFormPage';
+import { PostWorkFormPage } from '@/liff/pages/PostWorkFormPage';
+import { AccidentFormPage } from '@/liff/pages/AccidentFormPage';
+
+// Root
+const rootRoute = createRootRoute({ component: RootLayout });
+
+// Login
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/login',
+  component: LoginPage,
+});
+
+// Admin layout (認証ガード)
+// TODO(PROD): Replace with Supabase Auth before production.
+// Demo mode: sessionStorage-based auth, no real credential check.
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: 'admin',
+  component: AdminLayout,
+  beforeLoad: () => {
+    const isLoggedIn = sessionStorage.getItem('ecxia_logged_in');
+    if (!isLoggedIn) throw redirect({ to: '/login' });
+  },
+});
+
+// Admin pages
+const dashboardRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/',
+  component: DashboardPage,
+});
+
+const driversRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/drivers',
+  component: DriversPage,
+});
+
+const vehiclesRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/vehicles',
+  component: VehiclesPage,
+});
+
+const reportsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/reports',
+  component: ReportsPage,
+});
+
+const exportRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/export',
+  component: ExportPage,
+});
+
+// LIFF layout
+const liffRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/liff',
+  component: LiffLayout,
+});
+
+const preWorkRoute = createRoute({
+  getParentRoute: () => liffRoute,
+  path: '/pre-work',
+  component: PreWorkFormPage,
+});
+
+const inspectionRoute = createRoute({
+  getParentRoute: () => liffRoute,
+  path: '/inspection',
+  component: InspectionFormPage,
+});
+
+const postWorkRoute = createRoute({
+  getParentRoute: () => liffRoute,
+  path: '/post-work',
+  component: PostWorkFormPage,
+});
+
+const accidentRoute = createRoute({
+  getParentRoute: () => liffRoute,
+  path: '/accident',
+  component: AccidentFormPage,
+});
+
+// Router tree
+const routeTree = rootRoute.addChildren([
+  loginRoute,
+  adminRoute.addChildren([
+    dashboardRoute,
+    driversRoute,
+    vehiclesRoute,
+    reportsRoute,
+    exportRoute,
+  ]),
+  liffRoute.addChildren([
+    preWorkRoute,
+    inspectionRoute,
+    postWorkRoute,
+    accidentRoute,
+  ]),
+]);
+
+export const router = createRouter({ routeTree });
+
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router;
+  }
+}
