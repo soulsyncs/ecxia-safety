@@ -1,43 +1,27 @@
-import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { reportService, driverService, vehicleService } from '@/lib/demo-store';
-import type { Driver, Vehicle, PreWorkReport, PostWorkReport, DailyInspection, AccidentReport } from '@/types/database';
+import { useDrivers } from '@/hooks/use-drivers';
+import { useVehicles } from '@/hooks/use-vehicles';
+import { usePreWorkReports, usePostWorkReports, useDailyInspections, useAccidentReports } from '@/hooks/use-reports';
+import { useAuth } from '@/contexts/auth-context';
 
 export function ReportsPage() {
+  const { organization } = useAuth();
+  const orgId = organization?.id ?? '';
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]!);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [preWork, setPreWork] = useState<PreWorkReport[]>([]);
-  const [postWork, setPostWork] = useState<PostWorkReport[]>([]);
-  const [inspections, setInspections] = useState<DailyInspection[]>([]);
-  const [accidents, setAccidents] = useState<AccidentReport[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      driverService.list(),
-      vehicleService.list(),
-      reportService.getPreWorkReports(date),
-      reportService.getPostWorkReports(date),
-      reportService.getDailyInspections(date),
-      reportService.getAccidentReports(),
-    ])
-      .then(([d, v, pw, po, di, ar]) => {
-        setDrivers(d); setVehicles(v);
-        setPreWork(pw); setPostWork(po); setInspections(di); setAccidents(ar);
-      })
-      .catch(err => {
-        console.error('Failed to load reports:', err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [date]);
+  const { data: drivers = [] } = useDrivers(orgId);
+  const { data: vehicles = [] } = useVehicles(orgId);
+  const { data: preWork = [], isLoading: loadingPre } = usePreWorkReports(orgId, date);
+  const { data: postWork = [], isLoading: loadingPost } = usePostWorkReports(orgId, date);
+  const { data: inspections = [], isLoading: loadingInsp } = useDailyInspections(orgId, date);
+  const { data: accidents = [], isLoading: loadingAcc } = useAccidentReports(orgId);
+
+  const loading = loadingPre || loadingPost || loadingInsp || loadingAcc;
 
   const driverName = (id: string) => drivers.find(d => d.id === id)?.name ?? '-';
   const vehiclePlate = (id: string) => vehicles.find(v => v.id === id)?.plateNumber ?? '-';

@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { driverService, vehicleService } from '@/lib/demo-store';
-import type { Driver, Vehicle } from '@/types/database';
+import { useDrivers, useCreateDriver } from '@/hooks/use-drivers';
+import { useVehicles } from '@/hooks/use-vehicles';
+import { useAuth } from '@/contexts/auth-context';
+import { createDriverSchema, type CreateDriverInput } from '@/lib/validations';
 
 const statusLabel: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' }> = {
   active: { label: '稼働中', variant: 'default' },
@@ -17,25 +21,18 @@ const statusLabel: Record<string, { label: string; variant: 'default' | 'seconda
 };
 
 export function DriversPage() {
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const { organization } = useAuth();
+  const orgId = organization?.id ?? '';
+  const { data: drivers = [], isLoading } = useDrivers(orgId);
+  const { data: vehicles = [] } = useVehicles(orgId);
+  const createDriver = useCreateDriver();
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  useEffect(() => {
-    Promise.all([driverService.list(), vehicleService.list()])
-      .then(([d, v]) => {
-        setDrivers(d);
-        setVehicles(v);
-      })
-      .catch(err => {
-        console.error('Failed to load drivers:', err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, []);
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateDriverInput>({
+    resolver: zodResolver(createDriverSchema),
+    defaultValues: { isSenior: false, isNewHire: true, status: 'active' },
+  });
 
   const filteredDrivers = drivers.filter(d =>
     d.name.includes(search) || (d.nameKana && d.nameKana.includes(search)) || (d.phone && d.phone.includes(search))
@@ -46,34 +43,18 @@ export function DriversPage() {
     return vehicles.find(v => v.id === vehicleId)?.plateNumber ?? '-';
   };
 
-  const handleAddDriver = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const onSubmit = async (data: CreateDriverInput) => {
+    if (!organization) return;
     try {
-      const form = new FormData(e.currentTarget);
-      const driver = await driverService.create({
-        lineUserId: null,
-        name: form.get('name') as string,
-        nameKana: form.get('nameKana') as string || null,
-        phone: form.get('phone') as string || null,
-        dateOfBirth: form.get('dateOfBirth') as string || null,
-        hireDate: new Date().toISOString().split('T')[0]!,
-        licenseNumber: form.get('licenseNumber') as string || null,
-        licenseExpiry: null,
-        healthCheckDate: null,
-        isSenior: false,
-        isNewHire: true,
-        status: 'active',
-        defaultVehicleId: null,
-        registrationToken: crypto.randomUUID().slice(0, 8),
-      });
-      setDrivers(prev => [...prev, driver]);
+      await createDriver.mutateAsync({ input: data, organizationId: organization.id });
       setDialogOpen(false);
-    } catch (err) {
-      console.error('Failed to add driver:', err);
+      reset();
+    } catch {
+      // error handled by mutation
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-muted-foreground">読み込み中...</div>;
+  if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">読み込み中...</div>;
 
   return (
     <div>
@@ -90,28 +71,31 @@ export function DriversPage() {
             <DialogHeader>
               <DialogTitle>ドライバー新規登録</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleAddDriver} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">氏名 *</Label>
-                <Input id="name" name="name" required placeholder="山田 太郎" />
+                <Input id="name" {...register('name')} placeholder="山田 太郎" />
+                {errors.name && <p className="text-xs text-red-600">{errors.name.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="nameKana">フリガナ</Label>
-                <Input id="nameKana" name="nameKana" placeholder="ヤマダ タロウ" />
+                <Input id="nameKana" {...register('nameKana')} placeholder="ヤマダ タロウ" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">電話番号</Label>
-                <Input id="phone" name="phone" placeholder="090-0000-0000" />
+                <Input id="phone" {...register('phone')} placeholder="090-0000-0000" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dateOfBirth">生年月日</Label>
-                <Input id="dateOfBirth" name="dateOfBirth" type="date" />
+                <Input id="dateOfBirth" type="date" {...register('dateOfBirth')} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="licenseNumber">免許証番号</Label>
-                <Input id="licenseNumber" name="licenseNumber" placeholder="123456789012" />
+                <Input id="licenseNumber" {...register('licenseNumber')} placeholder="123456789012" />
               </div>
-              <Button type="submit" className="w-full">登録</Button>
+              <Button type="submit" className="w-full" disabled={createDriver.isPending}>
+                {createDriver.isPending ? '登録中...' : '登録'}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -156,7 +140,7 @@ export function DriversPage() {
                     <TableCell className="text-sm">{getVehiclePlate(driver.defaultVehicleId)}</TableCell>
                     <TableCell>
                       {driver.lineUserId ? (
-                        <Badge variant="default" className="bg-[#06C755]">連携済</Badge>
+                        <Badge variant="default" className="bg-ecxia-green">連携済</Badge>
                       ) : driver.registrationToken ? (
                         <Badge variant="secondary">登録待ち</Badge>
                       ) : (

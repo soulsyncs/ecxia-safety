@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { reportService, driverService } from '@/lib/demo-store';
+import { useDrivers } from '@/hooks/use-drivers';
+import { usePreWorkReports, usePostWorkReports, useDailyInspections, useAccidentReports } from '@/hooks/use-reports';
+import { useAuth } from '@/contexts/auth-context';
 
 type ExportType = 'pre_work' | 'post_work' | 'inspection' | 'accident';
 
@@ -31,6 +33,17 @@ function escapeCsv(value: string | number | boolean | null | undefined): string 
   return str;
 }
 
+function downloadCsv(csv: string, filename: string) {
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function ExportPage() {
   const [startDate, setStartDate] = useState(() => {
     const d = new Date(); d.setMonth(d.getMonth() - 1);
@@ -39,58 +52,53 @@ export function ExportPage() {
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]!);
   const [exporting, setExporting] = useState<ExportType | null>(null);
 
+  const { organization } = useAuth();
+  const orgId = organization?.id ?? '';
+  const { data: drivers = [] } = useDrivers(orgId);
+  const { data: preWork = [] } = usePreWorkReports(orgId, startDate);
+  const { data: postWork = [] } = usePostWorkReports(orgId, startDate);
+  const { data: inspections = [] } = useDailyInspections(orgId, startDate);
+  const { data: accidents = [] } = useAccidentReports(orgId);
+
+  const driverName = (id: string) => drivers.find(d => d.id === id)?.name ?? '-';
+
   const handleExport = async (type: ExportType) => {
     setExporting(type);
-    // デモ: CSVを生成してダウンロード
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 300));
 
-    const drivers = await driverService.list();
-    const driverMap = new Map(drivers.map(d => [d.id, d.name]));
     let csv = '';
     let filename = '';
 
     if (type === 'pre_work') {
-      const reports = await reportService.getPreWorkReports();
-      const filtered = reports.filter(r => r.reportDate >= startDate && r.reportDate <= endDate);
+      const filtered = preWork.filter(r => r.reportDate >= startDate && r.reportDate <= endDate);
       csv = '日付,ドライバー,出勤時刻,アルコール結果,測定値,確認者,体調,疲労度,睡眠時間,提出方法\n';
       for (const r of filtered) {
-        csv += [r.reportDate, escapeCsv(driverMap.get(r.driverId)), r.clockInAt, r.alcoholCheckResult, r.alcoholCheckValue ?? '', escapeCsv(r.alcoholCheckerName), r.healthCondition, r.fatigueLevel, r.sleepHours ?? '', r.submittedVia].join(',') + '\n';
+        csv += [r.reportDate, escapeCsv(driverName(r.driverId)), r.clockInAt, r.alcoholCheckResult, r.alcoholCheckValue ?? '', escapeCsv(r.alcoholCheckerName), r.healthCondition, r.fatigueLevel, r.sleepHours ?? '', r.submittedVia].join(',') + '\n';
       }
       filename = `業務前報告_${startDate}_${endDate}.csv`;
     } else if (type === 'post_work') {
-      const reports = await reportService.getPostWorkReports();
-      const filtered = reports.filter(r => r.reportDate >= startDate && r.reportDate <= endDate);
+      const filtered = postWork.filter(r => r.reportDate >= startDate && r.reportDate <= endDate);
       csv = '日付,ドライバー,退勤時刻,走行距離km,配送数,アルコール結果,道路状況\n';
       for (const r of filtered) {
-        csv += [r.reportDate, escapeCsv(driverMap.get(r.driverId)), r.clockOutAt, r.distanceKm, r.cargoDeliveredCount ?? '', r.alcoholCheckResult, escapeCsv(r.roadConditionNote)].join(',') + '\n';
+        csv += [r.reportDate, escapeCsv(driverName(r.driverId)), r.clockOutAt, r.distanceKm, r.cargoDeliveredCount ?? '', r.alcoholCheckResult, escapeCsv(r.roadConditionNote)].join(',') + '\n';
       }
       filename = `業務後報告_${startDate}_${endDate}.csv`;
     } else if (type === 'inspection') {
-      const reports = await reportService.getDailyInspections();
-      const filtered = reports.filter(r => r.inspectionDate >= startDate && r.inspectionDate <= endDate);
+      const filtered = inspections.filter(r => r.inspectionDate >= startDate && r.inspectionDate <= endDate);
       csv = '日付,ドライバー,全項目合格,異常メモ\n';
       for (const r of filtered) {
-        csv += [r.inspectionDate, escapeCsv(driverMap.get(r.driverId)), r.allPassed ? 'OK' : 'NG', escapeCsv(r.abnormalityNote)].join(',') + '\n';
+        csv += [r.inspectionDate, escapeCsv(driverName(r.driverId)), r.allPassed ? 'OK' : 'NG', escapeCsv(r.abnormalityNote)].join(',') + '\n';
       }
       filename = `日常点検_${startDate}_${endDate}.csv`;
     } else {
-      const reports = await reportService.getAccidentReports();
       csv = '発生日時,ドライバー,場所,概要,原因,再発防止策,負傷者,重大事故,状態\n';
-      for (const r of reports) {
-        csv += [r.occurredAt, escapeCsv(driverMap.get(r.driverId)), escapeCsv(r.location), escapeCsv(r.summary), escapeCsv(r.cause), escapeCsv(r.preventionMeasures), r.hasInjuries, r.isSerious, r.status].join(',') + '\n';
+      for (const r of accidents) {
+        csv += [r.occurredAt, escapeCsv(driverName(r.driverId)), escapeCsv(r.location), escapeCsv(r.summary), escapeCsv(r.cause), escapeCsv(r.preventionMeasures), r.hasInjuries, r.isSerious, r.status].join(',') + '\n';
       }
       filename = `事故報告_全件.csv`;
     }
 
-    // BOMつきUTF-8でダウンロード
-    const bom = '\uFEFF';
-    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(csv, filename);
     setExporting(null);
   };
 

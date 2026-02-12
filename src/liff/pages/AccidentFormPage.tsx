@@ -5,13 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
-import { reportService } from '@/lib/demo-store';
-import { demoDrivers } from '@/lib/demo-data';
+import { isDemoMode } from '@/lib/supabase';
+import { useLiffAuth, submitToEdgeFunction } from '@/liff/hooks/use-liff-auth';
+import { reportsService } from '@/services';
 
 export function AccidentFormPage() {
+  const { driver, vehicle, idToken } = useLiffAuth();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const driver = demoDrivers[0]!;
 
   const [form, setForm] = useState({
     location: '',
@@ -23,6 +24,8 @@ export function AccidentFormPage() {
     isSerious: false,
   });
 
+  if (!driver) return null;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (form.hasInjuries && !form.injuryDetails) return;
@@ -32,11 +35,10 @@ export function AccidentFormPage() {
       const occurredAt = submitTime.toISOString();
       const dateStr = submitTime.toISOString().split('T')[0]!;
 
-      await reportService.submitAccidentReport({
-        id: crypto.randomUUID(),
+      const payload = {
         organizationId: driver.organizationId,
         driverId: driver.id,
-        vehicleId: driver.defaultVehicleId,
+        vehicleId: vehicle?.id ?? driver.defaultVehicleId,
         occurredAt,
         location: form.location,
         summary: form.summary,
@@ -51,10 +53,20 @@ export function AccidentFormPage() {
           ? (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().split('T')[0]!; })()
           : null,
         status: 'submitted',
-        expiresAt: (() => { const d = new Date(dateStr); d.setFullYear(d.getFullYear() + 3); return d.toISOString().split('T')[0]!; })(),
-        createdAt: occurredAt,
-        updatedAt: occurredAt,
-      });
+      };
+
+      if (isDemoMode) {
+        const expiresAt = (() => { const d = new Date(dateStr); d.setFullYear(d.getFullYear() + 3); return d.toISOString().split('T')[0]!; })();
+        await reportsService.submitAccidentReport({
+          id: crypto.randomUUID(),
+          ...payload,
+          expiresAt,
+          createdAt: occurredAt,
+          updatedAt: occurredAt,
+        } as Parameters<typeof reportsService.submitAccidentReport>[0]);
+      } else {
+        await submitToEdgeFunction('accident', payload, idToken!);
+      }
       setSubmitted(true);
     } catch (err) {
       console.error('Failed to submit accident report:', err);
@@ -66,7 +78,7 @@ export function AccidentFormPage() {
   if (submitted) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
+        <CheckCircle className="h-16 w-16 text-ecxia-green mb-4" />
         <h2 className="text-xl font-bold mb-2">事故報告を提出しました</h2>
         <p className="text-muted-foreground">管理者に通知されました</p>
         <Button className="mt-6" onClick={() => setSubmitted(false)}>もう一度入力</Button>

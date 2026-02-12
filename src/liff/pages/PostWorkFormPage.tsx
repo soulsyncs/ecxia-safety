@@ -6,15 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Clock, CheckCircle, Plus, Trash2 } from 'lucide-react';
-import { reportService } from '@/lib/demo-store';
-import { demoDrivers, demoVehicles } from '@/lib/demo-data';
+import { isDemoMode } from '@/lib/supabase';
+import { useLiffAuth, submitToEdgeFunction } from '@/liff/hooks/use-liff-auth';
+import { reportsService } from '@/services';
 import type { RestPeriod } from '@/types/database';
 
 export function PostWorkFormPage() {
+  const { driver, vehicle, idToken } = useLiffAuth();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const driver = demoDrivers[0]!;
-  const vehicle = demoVehicles[0]!;
   const now = new Date();
   const today = now.toISOString().split('T')[0]!;
 
@@ -22,7 +22,7 @@ export function PostWorkFormPage() {
     endLocation: '市川市南八幡 本社',
     actualDestinations: '',
     distanceKm: '',
-    alcoholCheckResult: 'negative' as const,
+    alcoholCheckResult: 'negative' as 'negative' | 'positive',
     alcoholCheckerName: '田中 一郎',
     roadConditionNote: '',
     cargoDeliveredCount: '',
@@ -37,13 +37,14 @@ export function PostWorkFormPage() {
     setRestPeriods(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r));
   };
 
+  if (!driver || !vehicle) return null;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const submitTime = new Date(); // S-4: タイムスタンプは送信時に取得（法令精度）
-      await reportService.submitPostWorkReport({
-        id: crypto.randomUUID(),
+      const submitTime = new Date();
+      const payload = {
         organizationId: driver.organizationId,
         driverId: driver.id,
         vehicleId: vehicle.id,
@@ -59,10 +60,20 @@ export function PostWorkFormPage() {
         roadConditionNote: form.roadConditionNote || null,
         cargoDeliveredCount: form.cargoDeliveredCount ? parseInt(form.cargoDeliveredCount) : null,
         submittedVia: 'liff',
-        expiresAt: (() => { const d = new Date(today); d.setFullYear(d.getFullYear() + 1); return d.toISOString().split('T')[0]!; })(),
-        createdAt: submitTime.toISOString(),
-        updatedAt: submitTime.toISOString(),
-      });
+      };
+
+      if (isDemoMode) {
+        const expiresAt = (() => { const d = new Date(today); d.setFullYear(d.getFullYear() + 1); return d.toISOString().split('T')[0]!; })();
+        await reportsService.submitPostWorkReport({
+          id: crypto.randomUUID(),
+          ...payload,
+          expiresAt,
+          createdAt: submitTime.toISOString(),
+          updatedAt: submitTime.toISOString(),
+        } as Parameters<typeof reportsService.submitPostWorkReport>[0]);
+      } else {
+        await submitToEdgeFunction('post_work', payload, idToken!);
+      }
       setSubmitted(true);
     } catch (err) {
       console.error('Failed to submit post-work report:', err);
@@ -74,7 +85,7 @@ export function PostWorkFormPage() {
   if (submitted) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
+        <CheckCircle className="h-16 w-16 text-ecxia-green mb-4" />
         <h2 className="text-xl font-bold mb-2">業務後報告を提出しました</h2>
         <p className="text-muted-foreground mb-1">{driver.name} / {vehicle.plateNumber}</p>
         <p className="text-sm text-muted-foreground">退勤時刻: {now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</p>
@@ -86,7 +97,7 @@ export function PostWorkFormPage() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center gap-2 mb-2">
-        <FileText className="h-5 w-5 text-purple-600" />
+        <FileText className="h-5 w-5 text-ecxia-green-dark" />
         <h2 className="text-lg font-bold">業務後報告</h2>
       </div>
 
@@ -190,7 +201,7 @@ export function PostWorkFormPage() {
         </CardContent>
       </Card>
 
-      <Button type="submit" className="w-full h-12 text-base bg-[#06C755] hover:bg-[#05b04c]" disabled={submitting}>
+      <Button type="submit" className="w-full h-12 text-base rounded-full bg-ecxia-green hover:bg-ecxia-green-dark" disabled={submitting}>
         {submitting ? '送信中...' : '業務後報告を提出'}
       </Button>
     </form>

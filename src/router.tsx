@@ -12,6 +12,7 @@ import { PreWorkFormPage } from '@/liff/pages/PreWorkFormPage';
 import { InspectionFormPage } from '@/liff/pages/InspectionFormPage';
 import { PostWorkFormPage } from '@/liff/pages/PostWorkFormPage';
 import { AccidentFormPage } from '@/liff/pages/AccidentFormPage';
+import { isDemoMode, supabase } from '@/lib/supabase';
 
 // Root
 const rootRoute = createRootRoute({ component: RootLayout });
@@ -24,15 +25,18 @@ const loginRoute = createRoute({
 });
 
 // Admin layout (認証ガード)
-// TODO(PROD): Replace with Supabase Auth before production.
-// Demo mode: sessionStorage-based auth, no real credential check.
 const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'admin',
   component: AdminLayout,
-  beforeLoad: () => {
-    const isLoggedIn = sessionStorage.getItem('ecxia_logged_in');
-    if (!isLoggedIn) throw redirect({ to: '/login' });
+  beforeLoad: async () => {
+    if (isDemoMode) {
+      const isLoggedIn = sessionStorage.getItem('ecxia_logged_in');
+      if (!isLoggedIn) throw redirect({ to: '/login' });
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw redirect({ to: '/login' });
   },
 });
 

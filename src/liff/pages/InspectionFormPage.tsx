@@ -5,8 +5,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ClipboardCheck, CheckCircle, XCircle } from 'lucide-react';
-import { reportService } from '@/lib/demo-store';
-import { demoDrivers, demoVehicles } from '@/lib/demo-data';
+import { isDemoMode } from '@/lib/supabase';
+import { useLiffAuth, submitToEdgeFunction } from '@/liff/hooks/use-liff-auth';
+import { reportsService } from '@/services';
 
 const inspectionItems = [
   { category: 'エンジンルーム', items: [
@@ -35,12 +36,11 @@ const inspectionItems = [
 type CheckState = Record<string, boolean>;
 
 export function InspectionFormPage() {
+  const { driver, vehicle, idToken } = useLiffAuth();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [checks, setChecks] = useState<CheckState>({});
   const [abnormalityNote, setAbnormalityNote] = useState('');
-  const driver = demoDrivers[0]!;
-  const vehicle = demoVehicles[0]!;
   const today = new Date().toISOString().split('T')[0]!;
 
   const allKeys = inspectionItems.flatMap(c => c.items.map(i => i.key));
@@ -57,6 +57,8 @@ export function InspectionFormPage() {
     setChecks(newChecks);
   };
 
+  if (!driver || !vehicle) return null;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (hasAnyFalse && !abnormalityNote) return;
@@ -64,8 +66,7 @@ export function InspectionFormPage() {
     try {
       const submitTime = new Date();
       const allPassed = allChecked;
-      await reportService.submitDailyInspection({
-        id: crypto.randomUUID(),
+      const payload = {
         organizationId: driver.organizationId,
         driverId: driver.id,
         vehicleId: vehicle.id,
@@ -86,10 +87,20 @@ export function InspectionFormPage() {
         allPassed,
         abnormalityNote: abnormalityNote || null,
         submittedVia: 'liff',
-        expiresAt: (() => { const d = new Date(today); d.setFullYear(d.getFullYear() + 1); return d.toISOString().split('T')[0]!; })(),
-        createdAt: submitTime.toISOString(),
-        updatedAt: submitTime.toISOString(),
-      });
+      };
+
+      if (isDemoMode) {
+        const expiresAt = (() => { const d = new Date(today); d.setFullYear(d.getFullYear() + 1); return d.toISOString().split('T')[0]!; })();
+        await reportsService.submitDailyInspection({
+          id: crypto.randomUUID(),
+          ...payload,
+          expiresAt,
+          createdAt: submitTime.toISOString(),
+          updatedAt: submitTime.toISOString(),
+        } as Parameters<typeof reportsService.submitDailyInspection>[0]);
+      } else {
+        await submitToEdgeFunction('inspection', payload, idToken!);
+      }
       setSubmitted(true);
     } catch (err) {
       console.error('Failed to submit inspection:', err);
@@ -101,7 +112,7 @@ export function InspectionFormPage() {
   if (submitted) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
+        <CheckCircle className="h-16 w-16 text-ecxia-green mb-4" />
         <h2 className="text-xl font-bold mb-2">日常点検を提出しました</h2>
         <p className="text-muted-foreground">{vehicle.plateNumber}</p>
         <Badge className="mt-2" variant={allChecked ? 'default' : 'destructive'}>
@@ -116,10 +127,10 @@ export function InspectionFormPage() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <ClipboardCheck className="h-5 w-5 text-green-600" />
+          <ClipboardCheck className="h-5 w-5 text-ecxia-green-dark" />
           <h2 className="text-lg font-bold">日常点検</h2>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={setAllOk}>全てOK</Button>
+        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={setAllOk}>全てOK</Button>
       </div>
 
       <Card>
@@ -141,13 +152,13 @@ export function InspectionFormPage() {
                   type="button"
                   onClick={() => toggle(item.key)}
                   className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                    checked === true ? 'bg-green-50 border-green-300' :
+                    checked === true ? 'bg-ecxia-green-light border-ecxia-green/40' :
                     checked === false ? 'bg-red-50 border-red-300' :
                     'bg-gray-50 border-gray-200'
                   }`}
                 >
                   <span className="text-sm">{item.label}</span>
-                  {checked === true && <CheckCircle className="h-5 w-5 text-green-600" />}
+                  {checked === true && <CheckCircle className="h-5 w-5 text-ecxia-green-dark" />}
                   {checked === false && <XCircle className="h-5 w-5 text-red-600" />}
                   {checked === undefined && <span className="text-xs text-muted-foreground">タップして確認</span>}
                 </button>
@@ -175,7 +186,7 @@ export function InspectionFormPage() {
 
       <Button
         type="submit"
-        className="w-full h-12 text-base bg-[#06C755] hover:bg-[#05b04c]"
+        className="w-full h-12 text-base rounded-full bg-ecxia-green hover:bg-ecxia-green-dark"
         disabled={submitting || allKeys.some(k => checks[k] === undefined)}
       >
         {submitting ? '送信中...' : '日常点検を提出'}

@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
 import { Users, FileText, ClipboardCheck, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { dashboardService } from '@/lib/demo-store';
-import type { DailySubmissionSummary } from '@/types/database';
+import { useDailySummary } from '@/hooks/use-dashboard';
+import { useAuth } from '@/contexts/auth-context';
+import { isDemoMode } from '@/lib/supabase';
 
 function StatCard({ title, icon: Icon, value, total, missing, color }: {
   title: string;
@@ -27,7 +27,7 @@ function StatCard({ title, icon: Icon, value, total, missing, color }: {
         <div className="flex items-center gap-2 mt-1">
           <div className="flex-1 bg-gray-200 rounded-full h-2">
             <div
-              className={`h-2 rounded-full transition-all ${isComplete ? 'bg-green-500' : 'bg-amber-500'}`}
+              className={`h-2 rounded-full transition-all ${isComplete ? 'bg-ecxia-green' : 'bg-amber-500'}`}
               style={{ width: `${rate}%` }}
             />
           </div>
@@ -46,7 +46,7 @@ function StatCard({ title, icon: Icon, value, total, missing, color }: {
           </div>
         )}
         {isComplete && (
-          <p className="text-xs text-green-600 font-medium mt-2">全員提出済み</p>
+          <p className="text-xs text-ecxia-green-dark font-medium mt-2">全員提出済み</p>
         )}
       </CardContent>
     </Card>
@@ -54,24 +54,11 @@ function StatCard({ title, icon: Icon, value, total, missing, color }: {
 }
 
 export function DashboardPage() {
-  const [summary, setSummary] = useState<DailySubmissionSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { organization } = useAuth();
   const today = new Date().toISOString().split('T')[0]!;
+  const { data: summary, isLoading } = useDailySummary(today, organization?.id ?? '');
 
-  useEffect(() => {
-    dashboardService.getDailySummary(today)
-      .then(data => {
-        setSummary(data);
-      })
-      .catch(err => {
-        console.error('Failed to load dashboard summary:', err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [today]);
-
-  if (loading || !summary) {
+  if (isLoading || !summary) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">読み込み中...</div>;
   }
 
@@ -82,16 +69,18 @@ export function DashboardPage() {
           <h1 className="text-2xl font-bold">ダッシュボード</h1>
           <p className="text-muted-foreground">本日の提出状況 ({today})</p>
         </div>
-        <Badge variant="outline" className="text-sm">
-          デモモード
-        </Badge>
+        {isDemoMode && (
+          <Badge variant="outline" className="text-sm">
+            デモモード
+          </Badge>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">稼働ドライバー</CardTitle>
-            <Users className="h-4 w-4 text-blue-500" />
+            <Users className="h-4 w-4 text-ecxia-green" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{summary.totalDrivers}名</div>
@@ -104,7 +93,7 @@ export function DashboardPage() {
           value={summary.preWorkSubmitted}
           total={summary.totalDrivers}
           missing={summary.preWorkMissing}
-          color="text-blue-500"
+          color="text-ecxia-green-dark"
         />
         <StatCard
           title="日常点検"
@@ -112,7 +101,7 @@ export function DashboardPage() {
           value={summary.inspectionSubmitted}
           total={summary.totalDrivers}
           missing={summary.inspectionMissing}
-          color="text-green-500"
+          color="text-ecxia-green-vivid"
         />
         <StatCard
           title="業務後報告"
@@ -120,11 +109,10 @@ export function DashboardPage() {
           value={summary.postWorkSubmitted}
           total={summary.totalDrivers}
           missing={summary.postWorkMissing}
-          color="text-purple-500"
+          color="text-ecxia-green"
         />
       </div>
 
-      {/* アクティビティ */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">本日のアクティビティ</CardTitle>
@@ -150,9 +138,9 @@ export function DashboardPage() {
               </div>
             )}
             {summary.preWorkMissing.length === 0 && summary.inspectionMissing.length === 0 && summary.postWorkMissing.length === 0 && (
-              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-                <ClipboardCheck className="h-5 w-5 text-green-500" />
-                <p className="text-sm font-medium text-green-800">本日の未提出はありません</p>
+              <div className="flex items-center gap-3 p-3 bg-ecxia-green-light rounded-lg">
+                <ClipboardCheck className="h-5 w-5 text-ecxia-green" />
+                <p className="text-sm font-medium text-ecxia-green-dark">本日の未提出はありません</p>
               </div>
             )}
           </div>

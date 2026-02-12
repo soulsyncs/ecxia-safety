@@ -8,7 +8,6 @@ import type {
 } from '@/types/database';
 
 const ORG_ID = 'demo-org-ecxia-001';
-const TODAY = new Date().toISOString().split('T')[0]!;
 
 function daysAgo(n: number): string {
   const d = new Date();
