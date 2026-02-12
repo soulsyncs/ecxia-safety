@@ -1,6 +1,6 @@
 # ECXIA安全管理システム - 進捗管理
 
-**最終更新：2026年2月12日**
+**最終更新：2026年2月12日 20:15 JST**
 
 ---
 
@@ -9,21 +9,25 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                                                               │
-│   Phase 0（設計・基盤構築）: 100% 完了                        │
-│   Phase 0.5（デモUI実装）: 100% 完了                          │
-│   Phase 1〜4（実装 12ステップ）: 100% 完了                    │
+│   Phase 0（設計・基盤構築）:      100% 完了                  │
+│   Phase 0.5（デモUI実装）:        100% 完了                  │
+│   Phase 1〜4（実装 12ステップ）:  100% 完了                  │
+│   外部設定（Supabase/LINE/Vercel）: 95% 完了                │
 │                                                               │
 │   ✅ ビルド: PASS (1976 modules, 624KB JS)                   │
 │   ✅ 型チェック: PASS (0 errors)                              │
 │   ✅ ユニットテスト: 34/34 PASS                               │
+│   ✅ Supabase: 本番接続済み（21マイグレーション適用済み）    │
+│   ✅ LINE: チャネル作成・LIFF・Webhook 全設定完了            │
+│   ✅ Vercel: 本番デプロイ済み                                │
+│   ✅ Edge Functions: 5関数デプロイ済み                       │
 │                                                               │
-│   次のアクション（ユーザー手動）:                             │
-│      1. Supabaseプロジェクト作成 → URL + anon key取得         │
-│      2. supabase db push（マイグレーション実行）              │
-│      3. seed.sql実行（初期データ投入）                        │
-│      4. LINE Developers設定（LIFF ID取得）                    │
-│      5. .env.local にクレデンシャル設定                       │
-│      6. Vercelデプロイ                                        │
+│   残り作業:                                                   │
+│      1. Cron設定（Supabase Dashboard — 4スケジュール）       │
+│      2. LINE Loginチャネルを「公開」に変更                   │
+│      3. リッチメニュー作成（LINE Official Account Manager）  │
+│      4. あいさつメッセージのカスタマイズ                     │
+│      5. ドライバーのLINE友だち追加テスト                     │
 │                                                               │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -40,7 +44,118 @@
 | **Phase 2** | LINE連携・通知 | 完了 | 100% |
 | **Phase 3** | テスト | 完了 | 100% |
 | **Phase 4** | CI/CD・デプロイ設定 | 完了 | 100% |
-| **リリース** | 本番運用開始 | 外部設定待ち | - |
+| **外部設定** | Supabase/LINE/Vercel | ほぼ完了 | 95% |
+| **リリース** | 本番運用開始 | 残り5項目 | - |
+
+---
+
+## 本番環境情報（確定値）
+
+### Supabase
+| 項目 | 値 |
+|------|-----|
+| Project ref | `dirbmretnocymuttrlrc` |
+| URL | `https://dirbmretnocymuttrlrc.supabase.co` |
+| DB | PostgreSQL 15, 21マイグレーション適用済み |
+| Auth | 管理者ユーザー作成済み (admin@ecxia.co.jp / パスワードはSupabase Auth管理) |
+| Org ID | `a1b2c3d4-e5f6-7890-abcd-ef1234567890` |
+| Edge Functions | 5関数デプロイ済み (line-webhook, submit-report, link-driver, morning-reminder, check-submissions) |
+| Secrets | LINE_CHANNEL_SECRET, LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_ID 設定済み |
+
+### LINE Developers
+| 項目 | 値 |
+|------|-----|
+| プロバイダー | 株式会社ECXIA (ID: 2004856831) |
+| LINE公式アカウント | ECXIA安全管理 (@119oghsk) |
+| Messaging APIチャネル | ID: 2009117085 |
+| Channel Secret | (Supabase Secretsに保存) |
+| Channel Access Token | (長期トークン発行済み、Supabase Secretsに保存) |
+| LINE Loginチャネル | ID: 2009117128 (ECXIA安全管理 LIFF) — **状態: 開発中** |
+| LIFFアプリ | ID: `2009117128-QkmP07AJ`, URL: `https://liff.line.me/2009117128-QkmP07AJ` |
+| LIFF設定 | サイズ: Full, Scope: openid+profile, 友だち追加: On(normal) |
+| Webhook URL | `https://dirbmretnocymuttrlrc.supabase.co/functions/v1/line-webhook` |
+| Webhook利用 | ON |
+| 応答メッセージ | OFF（Webhook優先） |
+| あいさつメッセージ | ON（デフォルト） |
+
+### Vercel
+| 項目 | 値 |
+|------|-----|
+| URL | `https://ecxia-safety.vercel.app` |
+| Framework | Vite |
+| 環境変数 | VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_LIFF_ID (production+preview) |
+
+### GitHub
+| 項目 | 値 |
+|------|-----|
+| リポジトリ | `https://github.com/soulsyncs/ecxia-safety` (private) |
+| ブランチ | main |
+| コミット数 | 4 |
+
+---
+
+## 完了済み作業（外部設定）
+
+### Supabase設定 [完了]
+- [x] プロジェクト作成
+- [x] マイグレーション実行（21ファイル → 17テーブル + RLS + SECURITY DEFINER関数）
+- [x] seed.sql実行（初期データ: 1組織、1管理者、3ドライバー、5車両）
+- [x] 管理者ユーザー作成（admin@ecxia.co.jp / パスワードはSupabase Auth管理）
+- [x] Edge Functions 5関数デプロイ
+- [x] Secrets設定（LINE_CHANNEL_SECRET, LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_ID）
+
+### LINE Developers設定 [完了]
+- [x] プロバイダー作成（株式会社ECXIA）
+- [x] LINE公式アカウント作成（ECXIA安全管理 @119oghsk）
+- [x] Messaging API有効化
+- [x] Webhook URL設定 + 有効化
+- [x] チャネルアクセストークン（長期）発行
+- [x] LINE Loginチャネル作成（ECXIA安全管理 LIFF）
+- [x] LINE公式アカウントとLINE Loginチャネルのリンク
+- [x] LIFFアプリ作成（Full, openid+profile）
+- [x] 応答メッセージOFF（Webhook優先）
+
+### Vercel設定 [完了]
+- [x] デプロイ（ecxia-safety.vercel.app）
+- [x] 環境変数設定（VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_LIFF_ID）
+- [x] セキュリティヘッダー設定（vercel.json）
+
+### 3-AIセキュリティレビュー [完了]
+- [x] RLSポリシー全テーブル検証
+- [x] RLS循環参照修正（get_my_org_id() SECURITY DEFINER関数）
+- [x] event_logs INSERT policy追加
+- [x] RPC関数 auth.uid()検証追加
+
+---
+
+## 残り作業（リリース前に必要）
+
+### 1. Cron設定（Supabase Dashboard）
+Supabase Dashboardの「Database → Extensions」からpg_cronを有効化し、以下を設定:
+
+| スケジュール | Edge Function | 説明 |
+|-------------|---------------|------|
+| `0 23 * * *` (UTC) = JST 08:00 | morning-reminder | 朝のリマインド |
+| `30 0 * * *` (UTC) = JST 09:30 | check-submissions?type=pre_work | 業務前未提出アラート |
+| `0 10 * * *` (UTC) = JST 19:00 | check-submissions?type=post_work | 業務後未提出アラート |
+| `0 1 * * *` (UTC) = JST 10:00 | check-submissions?type=admin_summary | 管理者サマリー |
+
+### 2. LINE Loginチャネルを「公開」に変更
+LINE Developers Console → ECXIA安全管理 LIFF → 「開発中」→「公開」に変更
+（現在は「開発中」のため、チャネルに登録されたテスターしかLIFFを使えない）
+
+### 3. リッチメニュー作成
+LINE Official Account Managerでリッチメニュー（4分割）を作成:
+- 左上: 出勤（業務前報告） → `https://liff.line.me/2009117128-QkmP07AJ/pre-work`
+- 右上: 日常点検 → `https://liff.line.me/2009117128-QkmP07AJ/inspection`
+- 左下: 退勤（業務後報告） → `https://liff.line.me/2009117128-QkmP07AJ/post-work`
+- 右下: 事故報告 → `https://liff.line.me/2009117128-QkmP07AJ/accident`
+
+### 4. あいさつメッセージのカスタマイズ
+LINE Official Account Manager → あいさつメッセージ設定で、ECXIA向けのウェルカムメッセージを設定
+
+### 5. ドライバーのLINE友だち追加テスト
+QRコードまたは @119oghsk で友だち追加 → LIFFフォームが正常に動くか確認
 
 ---
 
@@ -83,107 +198,33 @@
 | 9 | 業務後報告 | src/liff/pages/PostWorkFormPage.tsx | 完了 |
 | 10 | 事故報告 | src/liff/pages/AccidentFormPage.tsx | 完了 |
 
-### デモデータ層
-- [x] demo-store.ts（localStorage擬似バックエンド）
-- [x] demo-data.ts（3ドライバー、5車両のサンプルデータ）
-
-### レイアウト・デザイン
-- [x] AdminLayout.tsx（サイドバー + ヘッダー）
-- [x] LiffLayout.tsx（モバイルヘッダー + コンテンツ）
-- [x] ECXIAブランドカラー統一（#49b93d）
-- [x] Tailwindカスタムカラー（ecxia-green, ecxia-green-dark等）
-- [x] CSSカスタムプロパティ（HSL形式）
-- [x] ECXIAロゴ組み込み（カラー版 + 白版）
-- [x] 日本語フォント設定（Noto Sans JP）
-
-### 3-AIデザインレビュー [完了]
-- [x] Claude Code: アーキテクチャ9項目レビュー → PASS
-- [x] Codex: 18項目3パスレビュー → PASS
-- [x] Gemini: セキュリティ・パフォーマンスレビュー → PASS
-- [x] 3者コンセンサス反映（16箇所修正）
-- [x] 残存する汎用色（text-green-*等）の完全排除確認
-- [x] TSC PASS / Viteビルド PASS
-
 ---
 
 ## Phase 1〜4: 実装（12ステップ計画） [完了]
 
 ### Step 1: RLS追加マイグレーション + seed.sql [完了]
-- [x] `supabase/migrations/20260212000019_add_admin_crud_policies.sql` — admin CRUD RLSポリシー
-- [x] `supabase/seed.sql` — ECXIA初期データ（組織、管理者、ドライバー3名、車両5台）
-
 ### Step 2: Supabaseクライアント強化 [完了]
-- [x] `src/lib/supabase.ts` — isDemoMode判定、snake/camelCase変換、エラーハンドリング
-
 ### Step 3: Zodバリデーションスキーマ [完了]
-- [x] `src/lib/validations/` — 7スキーマ + barrel export (auth, driver, vehicle, pre/post-work, inspection, accident)
-
 ### Step 4: Supabaseサービス層 [完了]
-- [x] `src/services/auth.service.ts` — Supabase Auth (login, logout, getSession, onAuthStateChange)
-- [x] `src/services/drivers.service.ts` — CRUD (list, getById, create, update)
-- [x] `src/services/vehicles.service.ts` — CRUD (list, getById, create, update)
-- [x] `src/services/reports.service.ts` — 4テーブルのget/submit (8メソッド)
-- [x] `src/services/dashboard.service.ts` — RPC get_daily_submission_summary
-- [x] `src/services/index.ts` — barrel export
-- [x] 全クエリにorganization_id、snake↔camelCase変換、デモモードフォールバック
-
 ### Step 5: TanStack Queryフック [完了]
-- [x] `src/hooks/use-auth.ts` — useLogin, useLogout, useSession
-- [x] `src/hooks/use-drivers.ts` — useDrivers, useDriver, useCreateDriver, useUpdateDriver
-- [x] `src/hooks/use-vehicles.ts` — useVehicles, useVehicle, useCreateVehicle, useUpdateVehicle
-- [x] `src/hooks/use-reports.ts` — 4種類のレポートフック
-- [x] `src/hooks/use-dashboard.ts` — useDailySummary
-
 ### Step 6: Auth統合 + ルーター修正 [完了]
-- [x] `src/contexts/auth-context.tsx` — Auth状態管理Context
-- [x] `src/router.tsx` — Supabase Auth認証ガード
-- [x] `src/app/layouts/RootLayout.tsx` — QueryClientProvider + AuthProvider
-- [x] `src/main.tsx` — QueryClient初期化
-
 ### Step 7: 管理画面ページ更新（6画面） [完了]
-- [x] LoginPage.tsx — React Hook Form + Zod + Supabase Auth
-- [x] DashboardPage.tsx — useDailySummary hook
-- [x] ReportsPage.tsx — useReports hooks + フィルタ
-- [x] DriversPage.tsx — React Hook Form + useDrivers/useCreateDriver
-- [x] VehiclesPage.tsx — React Hook Form + useVehicles/useCreateVehicle
-- [x] ExportPage.tsx — TanStack Queryフック + CSVエクスポート
-
 ### Step 8: LIFFフォーム更新（4画面） [完了]
-- [x] `src/liff/lib/liff-init.ts` — LIFF SDK初期化（デモモードフォールバック）
-- [x] `src/liff/hooks/use-liff-auth.ts` — LIFF認証フック + Edge Function送信
-- [x] LiffLayout.tsx — useLiffAuth統合
-- [x] PreWorkFormPage.tsx — React Hook Form + デモ/実接続分岐
-- [x] InspectionFormPage.tsx — 同上
-- [x] PostWorkFormPage.tsx — 同上
-- [x] AccidentFormPage.tsx — 同上 + 写真アップロード
-
 ### Step 9: Edge Functions（5関数） [完了]
-- [x] `supabase/functions/submit-report/index.ts` — 統合報告受信（LINE IDトークン検証 + Zodバリデーション）
-- [x] `supabase/functions/link-driver/index.ts` — ドライバーLINE連携（registration_token）
-- [x] `supabase/functions/line-webhook/index.ts` — LINE Webhook受信（HMAC-SHA256検証）
-- [x] `supabase/functions/morning-reminder/index.ts` — 朝リマインド（08:00）
-- [x] `supabase/functions/check-submissions/index.ts` — 未提出アラート + 管理者サマリー
-
 ### Step 10: PII masking + 監査ログ [完了]
-- [x] `src/lib/pii-mask.ts` — PIIマスキング（名前、電話、メール、免許番号、UUID）
-- [x] `src/lib/audit-log.ts` — 監査ログユーティリティ（デモモード対応）
-
 ### Step 11: テスト [完了]
-- [x] `tests/unit/validations.test.ts` — Zodスキーマテスト（19テスト）
-- [x] `tests/unit/pii-mask.test.ts` — PIIマスキングテスト（10テスト）
-- [x] `tests/unit/services.test.ts` — snake↔camelCase変換テスト（5テスト）
-- [x] `tests/e2e/login.spec.ts` — ログインフローE2E
-- [x] `tests/e2e/dashboard.spec.ts` — ダッシュボードE2E
-- [x] `tests/e2e/drivers.spec.ts` — ドライバー管理E2E
-- [x] `tests/e2e/liff-forms.spec.ts` — LIFFフォームE2E
-- [x] `vitest.config.ts` — Vitest設定
-- [x] `playwright.config.ts` — Playwright設定
-
 ### Step 12: CI/CD + デプロイ設定 [完了]
-- [x] `.github/workflows/ci.yml` — lint + type-check + test + build
-- [x] `.github/workflows/e2e.yml` — Playwright E2E + artifact upload
-- [x] `vercel.json` — Vercel SPA設定
-- [x] `scripts/deploy-edge-functions.sh` — Edge Functionsデプロイスクリプト
+
+---
+
+## マイグレーション一覧（21ファイル）
+
+| # | ファイル | 内容 |
+|---|---------|------|
+| 1-18 | 000001〜000018 | テーブル作成、RLS、インデックス |
+| 19 | 000019 | admin CRUD RLSポリシー追加 |
+| 20 | 000020 | セキュリティ強化（event_logs INSERT + RPC auth検証） |
+| 21 | 000021 | RLS循環参照修正（get_my_org_id() SECURITY DEFINER） |
 
 ---
 
@@ -192,100 +233,16 @@
 | チェック | 結果 |
 |---------|------|
 | `pnpm type-check` | ✅ 0 errors |
-| `pnpm build` | ✅ 成功（1976 modules, 624KB JS, 28KB CSS, 1.60s） |
-| `pnpm test` | ✅ 34/34 passed（3ファイル） |
-| デモモード | ✅ 環境変数未設定でも全画面動作 |
-
----
-
-## 本番稼働に必要な外部設定（ユーザー手動）
-
-1. **Supabaseプロジェクト作成** → URL + anon key + service role key取得
-2. **`supabase db push`** でマイグレーション実行（18ファイル → 17テーブル + RLS）
-3. **`supabase/seed.sql`実行** で初期データ投入
-4. **Supabase Auth** で管理者ユーザー作成
-5. **LINE Developers** でチャネル作成 → Messaging API有効化 → LIFF ID取得
-6. **`.env.local`** にクレデンシャル設定:
-   ```
-   VITE_SUPABASE_URL=https://xxx.supabase.co
-   VITE_SUPABASE_ANON_KEY=eyJ...
-   VITE_LIFF_ID=xxxx-xxxx
-   ```
-7. **Edge Functions secrets**:
-   ```
-   supabase secrets set LINE_CHANNEL_ID=xxx LINE_CHANNEL_SECRET=xxx LINE_CHANNEL_ACCESS_TOKEN=xxx
-   ```
-8. **Cron設定**（Supabase Dashboard）:
-   - morning-reminder: `0 23 * * *` (UTC = JST 08:00)
-   - check-submissions(pre_work): `30 0 * * *` (UTC = JST 09:30)
-   - check-submissions(post_work): `0 10 * * *` (UTC = JST 19:00)
-   - check-submissions(admin_summary): `0 1 * * *` (UTC = JST 10:00)
-9. **Vercel** にデプロイ（vercel.json設定済み）
-
----
-
-## ファイル構成（最終）
-
-```
-ecxia-safety/
-├── CLAUDE.md                              # マスターコンテキスト
-├── PROGRESS.md                            # この進捗ファイル
-├── package.json
-├── tsconfig.json / tsconfig.app.json / tsconfig.node.json
-├── vite.config.ts
-├── vitest.config.ts
-├── playwright.config.ts
-├── tailwind.config.js
-├── vercel.json
-├── .env.example
-├── .github/
-│   └── workflows/
-│       ├── ci.yml                         # lint + type-check + test + build
-│       └── e2e.yml                        # Playwright E2E
-├── docs/                                  # 設計書
-├── public/                                # ロゴ等
-├── scripts/
-│   └── deploy-edge-functions.sh           # Edge Functionsデプロイ
-├── src/
-│   ├── vite-env.d.ts                      # Vite型定義
-│   ├── main.tsx                           # エントリポイント
-│   ├── router.tsx                         # TanStack Router
-│   ├── contexts/
-│   │   └── auth-context.tsx               # Auth状態管理
-│   ├── app/
-│   │   ├── layouts/RootLayout.tsx         # 管理画面レイアウト
-│   │   ├── routes/                        # 管理画面6ページ
-│   │   └── components/                    # 管理画面コンポーネント
-│   ├── liff/
-│   │   ├── lib/liff-init.ts              # LIFF SDK初期化
-│   │   ├── hooks/use-liff-auth.ts        # LIFF認証フック
-│   │   ├── layouts/LiffLayout.tsx        # LIFFレイアウト
-│   │   └── pages/                        # LIFFフォーム4ページ
-│   ├── lib/
-│   │   ├── supabase.ts                   # Supabaseクライアント + 変換
-│   │   ├── pii-mask.ts                   # PIIマスキング
-│   │   ├── audit-log.ts                  # 監査ログ
-│   │   ├── demo-store.ts                 # デモバックエンド
-│   │   ├── demo-data.ts                  # デモデータ
-│   │   └── validations/                  # Zodスキーマ（7ファイル）
-│   ├── services/                          # Supabaseサービス層（6ファイル）
-│   ├── hooks/                             # TanStack Queryフック（5ファイル）
-│   ├── types/
-│   │   └── database.ts                   # DB型定義
-│   └── components/ui/                     # shadcn/ui（17コンポーネント）
-├── supabase/
-│   ├── seed.sql                          # 初期データ
-│   ├── migrations/                       # 19マイグレーション
-│   └── functions/                        # Edge Functions（5関数）
-│       ├── submit-report/
-│       ├── link-driver/
-│       ├── line-webhook/
-│       ├── morning-reminder/
-│       └── check-submissions/
-└── tests/
-    ├── unit/                             # ユニットテスト（3ファイル, 34テスト）
-    └── e2e/                              # E2Eテスト（4ファイル）
-```
+| `pnpm build` | ✅ 成功（1976 modules, 624KB JS, 28KB CSS） |
+| `pnpm test` | ✅ 34/34 passed |
+| デモモード | ✅ 全画面動作確認 |
+| 本番ログイン | ✅ admin@ecxia.co.jp で正常ログイン |
+| ダッシュボード | ✅ 3ドライバー、0/3提出表示 |
+| ドライバー管理 | ✅ 佐藤太郎、田中一郎、鈴木花子 表示 |
+| 車両管理 | ✅ 5台表示 |
+| 日報一覧 | ✅ 4タブ表示 |
+| エクスポート | ✅ CSV出力4種、日付範囲ピッカー |
+| コンソールエラー | ✅ 0件 |
 
 ---
 
@@ -300,46 +257,6 @@ pnpm test         # ユニットテスト（Vitest）
 pnpm test:e2e     # E2Eテスト（Playwright）
 pnpm lint         # ESLint
 ```
-
----
-
-## 技術スタック（確定済み）
-
-| 技術 | バージョン | 用途 |
-|------|-----------|------|
-| React | 18.x | UI |
-| TypeScript | 5.x (Strict) | 型安全 |
-| Vite | 5.x | ビルド |
-| Tailwind CSS | 3.x | スタイリング |
-| shadcn/ui | 最新 | UIコンポーネント（17個） |
-| TanStack Router | 1.x | ルーティング（code-based） |
-| TanStack Query | 5.x | サーバー状態管理 |
-| React Hook Form | 7.x | フォーム |
-| Zod | 3.x | バリデーション |
-| @supabase/supabase-js | 2.x | バックエンド |
-| @line/liff | 2.x | LINE連携 |
-| Lucide React | 最新 | アイコン |
-| date-fns | 3.x | 日付処理 |
-| Vitest | 3.x | ユニットテスト |
-| Playwright | 最新 | E2Eテスト |
-
----
-
-## ロゴ・ブランド素材
-
-| ファイル | 用途 | サイズ |
-|---------|------|--------|
-| public/ecxia-logo.png | カラーロゴ（ログイン画面等） | 49KB |
-| public/ecxia-logo-footer.png | 白ロゴ（サイドバー・ヘッダー） | 6.7KB |
-
-### ブランドカラー
-
-| 名前 | HEX | Tailwindクラス |
-|------|-----|----------------|
-| Primary | #49b93d | ecxia-green |
-| Dark | #3a9430 | ecxia-green-dark |
-| Vivid | #50cb43 | ecxia-green-vivid |
-| Light | #eef6ed | ecxia-green-light |
 
 ---
 

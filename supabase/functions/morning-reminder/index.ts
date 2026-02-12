@@ -26,9 +26,10 @@ async function pushMessage(
 }
 
 serve(async (req: Request) => {
-  // Cron / 手動実行のみ許可
+  // Cron / 手動実行のみ許可（service_role_key検証）
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
+  const expectedToken = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!authHeader || !expectedToken || authHeader !== `Bearer ${expectedToken}`) {
     return new Response('Unauthorized', { status: 401 });
   }
 

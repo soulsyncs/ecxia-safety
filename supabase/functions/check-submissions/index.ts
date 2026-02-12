@@ -25,8 +25,10 @@ async function pushMessage(
 }
 
 serve(async (req: Request) => {
+  // Cron / 手動実行のみ許可（service_role_key検証）
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
+  const expectedToken = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!authHeader || !expectedToken || authHeader !== `Bearer ${expectedToken}`) {
     return new Response('Unauthorized', { status: 401 });
   }
 
@@ -40,7 +42,9 @@ serve(async (req: Request) => {
       // bodyなしの場合はデフォルト
     }
 
-    const today = new Date().toISOString().split('T')[0]!;
+    // JSTで当日日付を取得（日本はDSTなし、UTC+9固定）
+    const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const today = jstNow.toISOString().split('T')[0]!;
 
     // LINE連携済みの全組織を取得
     const { data: orgs } = await supabase
