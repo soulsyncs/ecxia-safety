@@ -1,6 +1,6 @@
 # ECXIA安全管理システム - 進捗管理
 
-**最終更新：2026年2月12日 20:15 JST**
+**最終更新：2026年2月13日 07:42 JST**
 
 ---
 
@@ -12,22 +12,23 @@
 │   Phase 0（設計・基盤構築）:      100% 完了                  │
 │   Phase 0.5（デモUI実装）:        100% 完了                  │
 │   Phase 1〜4（実装 12ステップ）:  100% 完了                  │
-│   外部設定（Supabase/LINE/Vercel）: 95% 完了                │
+│   外部設定（Supabase/LINE/Vercel）: 100% 完了 🎉            │
 │                                                               │
 │   ✅ ビルド: PASS (1976 modules, 624KB JS)                   │
 │   ✅ 型チェック: PASS (0 errors)                              │
 │   ✅ ユニットテスト: 34/34 PASS                               │
-│   ✅ Supabase: 本番接続済み（21マイグレーション適用済み）    │
+│   ✅ Supabase: 本番接続済み（22マイグレーション適用済み）    │
 │   ✅ LINE: チャネル作成・LIFF・Webhook 全設定完了            │
+│   ✅ LINE Login: 公開済み（全ユーザー利用可能）              │
+│   ✅ リッチメニュー: 4分割メニュー作成・有効化済み           │
+│   ✅ あいさつメッセージ: OFF（Webhook follow handler優先）   │
 │   ✅ Vercel: 本番デプロイ済み                                │
-│   ✅ Edge Functions: 5関数デプロイ済み                       │
+│   ✅ Edge Functions: 5関数デプロイ済み（Bearer認証強化済み） │
+│   ✅ Cron: 4スケジュール設定済み（pg_cron + pg_net）         │
+│   ✅ 3-AIセキュリティレビュー: 全修正適用済み                │
 │                                                               │
 │   残り作業:                                                   │
-│      1. Cron設定（Supabase Dashboard — 4スケジュール）       │
-│      2. LINE Loginチャネルを「公開」に変更                   │
-│      3. リッチメニュー作成（LINE Official Account Manager）  │
-│      4. あいさつメッセージのカスタマイズ                     │
-│      5. ドライバーのLINE友だち追加テスト                     │
+│      1. ドライバーのLINE友だち追加テスト（実運用テスト）     │
 │                                                               │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -44,8 +45,9 @@
 | **Phase 2** | LINE連携・通知 | 完了 | 100% |
 | **Phase 3** | テスト | 完了 | 100% |
 | **Phase 4** | CI/CD・デプロイ設定 | 完了 | 100% |
-| **外部設定** | Supabase/LINE/Vercel | ほぼ完了 | 95% |
-| **リリース** | 本番運用開始 | 残り5項目 | - |
+| **外部設定** | Supabase/LINE/Vercel | 完了 | 100% |
+| **3-AIレビュー** | セキュリティ修正 | 完了 | 100% |
+| **リリース** | 本番運用開始 | 残り1項目（実運用テスト） | - |
 
 ---
 
@@ -56,7 +58,7 @@
 |------|-----|
 | Project ref | `dirbmretnocymuttrlrc` |
 | URL | `https://dirbmretnocymuttrlrc.supabase.co` |
-| DB | PostgreSQL 15, 21マイグレーション適用済み |
+| DB | PostgreSQL 15, 22マイグレーション適用済み |
 | Auth | 管理者ユーザー作成済み (admin@ecxia.co.jp / パスワードはSupabase Auth管理) |
 | Org ID | `a1b2c3d4-e5f6-7890-abcd-ef1234567890` |
 | Edge Functions | 5関数デプロイ済み (line-webhook, submit-report, link-driver, morning-reminder, check-submissions) |
@@ -70,13 +72,15 @@
 | Messaging APIチャネル | ID: 2009117085 |
 | Channel Secret | (Supabase Secretsに保存) |
 | Channel Access Token | (長期トークン発行済み、Supabase Secretsに保存) |
-| LINE Loginチャネル | ID: 2009117128 (ECXIA安全管理 LIFF) — **状態: 開発中** |
+| LINE Loginチャネル | ID: 2009117128 (ECXIA安全管理 LIFF) — **状態: 公開済み** |
 | LIFFアプリ | ID: `2009117128-QkmP07AJ`, URL: `https://liff.line.me/2009117128-QkmP07AJ` |
 | LIFF設定 | サイズ: Full, Scope: openid+profile, 友だち追加: On(normal) |
 | Webhook URL | `https://dirbmretnocymuttrlrc.supabase.co/functions/v1/line-webhook` |
 | Webhook利用 | ON |
 | 応答メッセージ | OFF（Webhook優先） |
-| あいさつメッセージ | ON（デフォルト） |
+| あいさつメッセージ | OFF（Webhook follow handler優先） |
+| リッチメニュー | richmenu-e00f04f248e91d8e676e8cca060b81e9（4分割、全ユーザーデフォルト） |
+| Cron | pg_cron + pg_net有効、4スケジュール設定済み |
 
 ### Vercel
 | 項目 | 値 |
@@ -90,7 +94,7 @@
 |------|-----|
 | リポジトリ | `https://github.com/soulsyncs/ecxia-safety` (private) |
 | ブランチ | main |
-| コミット数 | 4 |
+| コミット数 | 6 |
 
 ---
 
@@ -114,6 +118,17 @@
 - [x] LINE公式アカウントとLINE Loginチャネルのリンク
 - [x] LIFFアプリ作成（Full, openid+profile）
 - [x] 応答メッセージOFF（Webhook優先）
+- [x] LINE Loginチャネル「公開」に変更（全ユーザー利用可能）
+- [x] リッチメニュー作成（4分割: 出勤/日常点検/退勤/事故報告）
+- [x] あいさつメッセージOFF（Webhook follow handler優先）
+
+### 3-AIセキュリティレビュー修正 [完了]
+- [x] check-submissions JST日付バグ修正（UTC→JST+9）
+- [x] Bearer認証強化（morning-reminder + check-submissions）
+- [x] PROGRESS.mdからSecrets除去
+- [x] organizations テーブルにLINE情報設定
+- [x] pg_cron + pg_net有効化 + 4 Cronスケジュール設定
+- [x] Edge Functions 5関数再デプロイ
 
 ### Vercel設定 [完了]
 - [x] デプロイ（ecxia-safety.vercel.app）
@@ -130,31 +145,19 @@
 
 ## 残り作業（リリース前に必要）
 
-### 1. Cron設定（Supabase Dashboard）
-Supabase Dashboardの「Database → Extensions」からpg_cronを有効化し、以下を設定:
+### ~~1. Cron設定~~ [完了]
+pg_cron + pg_net有効化済み。4スケジュール設定済み。
 
-| スケジュール | Edge Function | 説明 |
-|-------------|---------------|------|
-| `0 23 * * *` (UTC) = JST 08:00 | morning-reminder | 朝のリマインド |
-| `30 0 * * *` (UTC) = JST 09:30 | check-submissions?type=pre_work | 業務前未提出アラート |
-| `0 10 * * *` (UTC) = JST 19:00 | check-submissions?type=post_work | 業務後未提出アラート |
-| `0 1 * * *` (UTC) = JST 10:00 | check-submissions?type=admin_summary | 管理者サマリー |
+### ~~2. LINE Loginチャネルを「公開」~~ [完了]
+2026-02-13 公開済み。全LINEユーザーが利用可能。
 
-### 2. LINE Loginチャネルを「公開」に変更
-LINE Developers Console → ECXIA安全管理 LIFF → 「開発中」→「公開」に変更
-（現在は「開発中」のため、チャネルに登録されたテスターしかLIFFを使えない）
+### ~~3. リッチメニュー作成~~ [完了]
+Messaging API経由で4分割メニュー作成・画像アップロード・デフォルト設定済み。
 
-### 3. リッチメニュー作成
-LINE Official Account Managerでリッチメニュー（4分割）を作成:
-- 左上: 出勤（業務前報告） → `https://liff.line.me/2009117128-QkmP07AJ/pre-work`
-- 右上: 日常点検 → `https://liff.line.me/2009117128-QkmP07AJ/inspection`
-- 左下: 退勤（業務後報告） → `https://liff.line.me/2009117128-QkmP07AJ/post-work`
-- 右下: 事故報告 → `https://liff.line.me/2009117128-QkmP07AJ/accident`
+### ~~4. あいさつメッセージ~~ [完了]
+OFF設定済み（Webhook follow handlerで対応、重複防止）。
 
-### 4. あいさつメッセージのカスタマイズ
-LINE Official Account Manager → あいさつメッセージ設定で、ECXIA向けのウェルカムメッセージを設定
-
-### 5. ドライバーのLINE友だち追加テスト
+### 5. ドライバーのLINE友だち追加テスト [未実施]
 QRコードまたは @119oghsk で友だち追加 → LIFFフォームが正常に動くか確認
 
 ---
@@ -217,7 +220,7 @@ QRコードまたは @119oghsk で友だち追加 → LIFFフォームが正常�
 
 ---
 
-## マイグレーション一覧（21ファイル）
+## マイグレーション一覧（22ファイル）
 
 | # | ファイル | 内容 |
 |---|---------|------|
@@ -225,6 +228,7 @@ QRコードまたは @119oghsk で友だち追加 → LIFFフォームが正常�
 | 19 | 000019 | admin CRUD RLSポリシー追加 |
 | 20 | 000020 | セキュリティ強化（event_logs INSERT + RPC auth検証） |
 | 21 | 000021 | RLS循環参照修正（get_my_org_id() SECURITY DEFINER） |
+| 22 | 000022 | pg_cron + pg_net拡張有効化 |
 
 ---
 
