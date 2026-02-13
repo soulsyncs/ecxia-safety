@@ -82,7 +82,8 @@ export function useLiffAuth(): LiffAuthState {
         });
 
         if (!res.ok) {
-          throw new Error('ドライバー情報の取得に失敗しました');
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error(errBody.message ?? 'ドライバー情報の取得に失敗しました');
         }
 
         const data = await res.json();

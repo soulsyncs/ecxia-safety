@@ -12,6 +12,7 @@ import { PreWorkFormPage } from '@/liff/pages/PreWorkFormPage';
 import { InspectionFormPage } from '@/liff/pages/InspectionFormPage';
 import { PostWorkFormPage } from '@/liff/pages/PostWorkFormPage';
 import { AccidentFormPage } from '@/liff/pages/AccidentFormPage';
+import { RegisterPage } from '@/liff/pages/RegisterPage';
 import { isDemoMode, supabase } from '@/lib/supabase';
 
 // Root
@@ -102,6 +103,13 @@ const accidentRoute = createRoute({
   component: AccidentFormPage,
 });
 
+// LIFF register (LiffLayout外 — 認証ガードなし)
+const registerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/liff/register',
+  component: RegisterPage,
+});
+
 // Router tree
 const routeTree = rootRoute.addChildren([
   loginRoute,
@@ -112,6 +120,7 @@ const routeTree = rootRoute.addChildren([
     reportsRoute,
     exportRoute,
   ]),
+  registerRoute,
   liffRoute.addChildren([
     preWorkRoute,
     inspectionRoute,
