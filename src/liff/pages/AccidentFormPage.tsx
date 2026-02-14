@@ -32,7 +32,7 @@ export function AccidentFormPage() {
     notes: '',
   });
 
-  const { clearSaved } = useFormAutosave('ecxia:accident', form, setForm);
+  const { clearSaved } = useFormAutosave(driver ? `ecxia:accident:${driver.id}` : '', form, setForm);
 
   const handlePhotoAdd = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;

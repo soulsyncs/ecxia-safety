@@ -9,6 +9,7 @@ interface RateLimitEntry {
 }
 
 const store = new Map<string, RateLimitEntry>();
+const MAX_STORE_SIZE = 10_000; // メモリ枯渇防止: 最大エントリ数
 
 // Cleanup expired entries periodically
 const CLEANUP_INTERVAL = 60_000; // 1 minute
@@ -20,6 +21,12 @@ function cleanup() {
   lastCleanup = now;
   for (const [key, entry] of store) {
     if (entry.resetAt < now) store.delete(key);
+  }
+  // サイズ上限超過時は古いエントリから削除
+  if (store.size > MAX_STORE_SIZE) {
+    const entries = [...store.entries()].sort((a, b) => a[1].resetAt - b[1].resetAt);
+    const toRemove = entries.slice(0, store.size - MAX_STORE_SIZE);
+    for (const [key] of toRemove) store.delete(key);
   }
 }
 

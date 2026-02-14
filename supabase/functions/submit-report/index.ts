@@ -249,14 +249,28 @@ serve(async (req: Request) => {
 
       // 事故報告の写真アップロード処理
       if (type === 'accident' && Array.isArray(body.photos) && body.photos.length > 0 && result.id) {
+        // MIME typeホワイトリスト（SVG等のXSSリスクを排除）
+        const ALLOWED_MIME: Record<string, { ext: string; magic: number[] }> = {
+          'image/jpeg': { ext: 'jpg', magic: [0xFF, 0xD8, 0xFF] },
+          'image/png':  { ext: 'png', magic: [0x89, 0x50, 0x4E, 0x47] },
+          'image/webp': { ext: 'webp', magic: [0x52, 0x49, 0x46, 0x46] }, // "RIFF"
+        };
+        const MAX_BASE64_LENGTH = 14_000_000; // ~10MB decoded
+
         const photos = body.photos.slice(0, 5); // 最大5枚
         for (const photo of photos) {
           if (typeof photo.base64 !== 'string' || typeof photo.mimeType !== 'string') continue;
-          if (!photo.mimeType.startsWith('image/')) continue;
+          // MIMEホワイトリスト検証
+          const allowed = ALLOWED_MIME[photo.mimeType];
+          if (!allowed) continue;
+          // Base64文字列長でデコード前DoSを防止
+          if (photo.base64.length > MAX_BASE64_LENGTH) continue;
           const bytes = Uint8Array.from(atob(photo.base64), c => c.charCodeAt(0));
           if (bytes.length > 10 * 1024 * 1024) continue; // 10MBリミット
-          const ext = photo.mimeType === 'image/png' ? 'png' : 'jpg';
-          const path = `${driverRow.organization_id}/${result.id}/${crypto.randomUUID()}.${ext}`;
+          // マジックバイト検証（Content-Type偽装を防止）
+          const magicMatch = allowed.magic.every((b, i) => bytes[i] === b);
+          if (!magicMatch) continue;
+          const path = `${driverRow.organization_id}/${result.id}/${crypto.randomUUID()}.${allowed.ext}`;
           const { error: uploadError } = await supabase.storage.from('accident-photos').upload(path, bytes, {
             contentType: photo.mimeType,
           });

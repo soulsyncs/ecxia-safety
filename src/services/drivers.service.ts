@@ -53,7 +53,13 @@ async function generateRegistrationToken(id: string, organizationId: string): Pr
   const token = crypto.randomUUID();
   if (isDemoMode) return token;
 
-  const { error } = await supabase.from('drivers').update({ registration_token: token })
+  const expiresAt = new Date();
+  expiresAt.setHours(expiresAt.getHours() + 24);
+
+  const { error } = await supabase.from('drivers').update({
+    registration_token: token,
+    registration_token_expires_at: expiresAt.toISOString(),
+  })
     .eq('id', id)
     .eq('organization_id', organizationId);
   if (error) handleSupabaseError(error);

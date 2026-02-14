@@ -33,7 +33,7 @@ export function PostWorkFormPage() {
     { start: '12:00', end: '13:00', location: '' },
   ]);
 
-  const { clearSaved } = useFormAutosave('ecxia:post_work', form, setForm);
+  const { clearSaved } = useFormAutosave(driver ? `ecxia:post_work:${driver.id}` : '', form, setForm);
 
   const addRest = () => setRestPeriods(prev => [...prev, { start: '', end: '', location: '' }]);
   const removeRest = (i: number) => setRestPeriods(prev => prev.filter((_, idx) => idx !== i));

@@ -32,7 +32,7 @@ export function PreWorkFormPage() {
     cargoCount: '',
   });
 
-  const { clearSaved } = useFormAutosave('ecxia:pre_work', form, setForm);
+  const { clearSaved } = useFormAutosave(driver ? `ecxia:pre_work:${driver.id}` : '', form, setForm);
 
   if (!driver || !vehicle) return null;
 

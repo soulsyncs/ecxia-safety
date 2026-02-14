@@ -17,9 +17,9 @@ export function useFormAutosave<T extends Record<string, unknown>>(
 ) {
   const initialized = useRef(false);
 
-  // 初回マウント時にlocalStorageから復元
+  // 初回マウント時にlocalStorageから復元（キーが空の場合はスキップ）
   useEffect(() => {
-    if (initialized.current) return;
+    if (initialized.current || !key) return;
     initialized.current = true;
     try {
       const saved = localStorage.getItem(key);
@@ -32,8 +32,9 @@ export function useFormAutosave<T extends Record<string, unknown>>(
     }
   }, [key, setForm]);
 
-  // 定期的にlocalStorageに保存
+  // 定期的にlocalStorageに保存（キーが空の場合はスキップ）
   useEffect(() => {
+    if (!key) return;
     const timer = setInterval(() => {
       try {
         localStorage.setItem(key, JSON.stringify(form));

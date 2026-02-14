@@ -77,7 +77,7 @@ serve(async (req: Request) => {
     // registration_tokenでドライバーを検索
     const { data: driver, error: findError } = await supabase
       .from('drivers')
-      .select('id, name, organization_id')
+      .select('id, name, organization_id, registration_token_expires_at')
       .eq('registration_token', registrationToken)
       .is('line_user_id', null)
       .single();
@@ -85,6 +85,13 @@ serve(async (req: Request) => {
     if (findError || !driver) {
       return new Response(JSON.stringify({ message: '無効な登録トークンです。管理者に確認してください。' }), {
         status: 404, headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
+      });
+    }
+
+    // トークン有効期限チェック
+    if (driver.registration_token_expires_at && new Date(driver.registration_token_expires_at) < new Date()) {
+      return new Response(JSON.stringify({ message: '登録トークンの有効期限が切れています。管理者に再発行を依頼してください。' }), {
+        status: 410, headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
       });
     }
 
@@ -101,12 +108,13 @@ serve(async (req: Request) => {
       });
     }
 
-    // LINE User IDを紐付け + registration_tokenをNULL化（使い捨て）
+    // LINE User IDを紐付け + registration_token/expires_atをNULL化（使い捨て）
     const { error: updateError } = await supabase
       .from('drivers')
       .update({
         line_user_id: lineUserId,
         registration_token: null,
+        registration_token_expires_at: null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', driver.id);

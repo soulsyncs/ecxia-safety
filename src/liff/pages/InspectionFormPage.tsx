@@ -45,7 +45,7 @@ export function InspectionFormPage() {
   const [abnormalityNote, setAbnormalityNote] = useState('');
   const today = new Date().toISOString().split('T')[0]!;
 
-  const { clearSaved } = useFormAutosave('ecxia:inspection', checks, setChecks as (updater: (prev: CheckState) => CheckState) => void);
+  const { clearSaved } = useFormAutosave(driver ? `ecxia:inspection:${driver.id}` : '', checks, setChecks as (updater: (prev: CheckState) => CheckState) => void);
 
   const allKeys = inspectionItems.flatMap(c => c.items.map(i => i.key));
   const allChecked = allKeys.every(k => checks[k] === true);
