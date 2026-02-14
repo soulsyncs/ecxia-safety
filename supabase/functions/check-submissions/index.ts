@@ -3,6 +3,7 @@
 // Cron: 0 0:30 * * * (UTC=JST 09:30), 0 10 * * * (UTC=JST 19:00), 0 1 * * * (UTC=JST 10:00)
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { maskName } from '../_shared/pii-mask.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -169,7 +170,7 @@ serve(async (req: Request) => {
 
         // TODO: 管理者へのLINE通知（管理者もLINE連携する場合）
         // 現時点ではログ出力のみ
-        console.log(`Admin summary for ${org.name}:`, summary);
+        console.log(`Admin summary for org ${org.id}: pre=${preCount}/${total}, insp=${inspCount}/${total}, preMissing=${preMissing.length}, inspMissing=${inspMissing.length}`);
         totalAlerts++;
       }
     }
@@ -182,7 +183,7 @@ serve(async (req: Request) => {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err) {
-    console.error('Check submissions error:', err);
+    console.error('Check submissions error:', (err as Error).message);
     return new Response(JSON.stringify({ error: 'Internal error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

@@ -120,6 +120,7 @@ export async function submitToEdgeFunction(
   type: 'pre_work' | 'post_work' | 'inspection' | 'accident',
   payload: Record<string, unknown>,
   idToken: string,
+  extra?: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const res = await fetch(`${EDGE_FUNCTION_BASE}/submit-report`, {
     method: 'POST',
@@ -127,7 +128,7 @@ export async function submitToEdgeFunction(
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${idToken}`,
     },
-    body: JSON.stringify({ action: 'submit', type, data: payload }),
+    body: JSON.stringify({ action: 'submit', type, data: payload, ...extra }),
   });
 
   if (!res.ok) {

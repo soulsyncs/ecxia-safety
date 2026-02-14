@@ -3,6 +3,7 @@
 // Cron: 0 23 * * * (UTC = JST 08:00)
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { maskName } from '../_shared/pii-mask.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -72,7 +73,7 @@ serve(async (req: Request) => {
           totalSent++;
         } catch (err) {
           // 個別の送信失敗はスキップ（ブロック済み等）
-          console.error(`Failed to send to driver ${driver.id}:`, err);
+          console.error(`Failed to send to driver ${driver.id} (${maskName(driver.name)}):`, (err as Error).message);
         }
       }
     }
@@ -81,7 +82,7 @@ serve(async (req: Request) => {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err) {
-    console.error('Morning reminder error:', err);
+    console.error('Morning reminder error:', (err as Error).message);
     return new Response(JSON.stringify({ error: 'Internal error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

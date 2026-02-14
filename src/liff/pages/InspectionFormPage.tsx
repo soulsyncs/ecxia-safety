@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ClipboardCheck, CheckCircle, XCircle } from 'lucide-react';
 import { isDemoMode } from '@/lib/supabase';
 import { useLiffAuth, submitToEdgeFunction } from '@/liff/hooks/use-liff-auth';
+import { useFormAutosave } from '@/liff/hooks/use-form-autosave';
 import { reportsService } from '@/services';
 
 const inspectionItems = [
@@ -43,6 +44,8 @@ export function InspectionFormPage() {
   const [checks, setChecks] = useState<CheckState>({});
   const [abnormalityNote, setAbnormalityNote] = useState('');
   const today = new Date().toISOString().split('T')[0]!;
+
+  const { clearSaved } = useFormAutosave('ecxia:inspection', checks, setChecks as (updater: (prev: CheckState) => CheckState) => void);
 
   const allKeys = inspectionItems.flatMap(c => c.items.map(i => i.key));
   const allChecked = allKeys.every(k => checks[k] === true);
@@ -102,6 +105,7 @@ export function InspectionFormPage() {
       } else {
         await submitToEdgeFunction('inspection', payload, idToken!);
       }
+      clearSaved();
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : '送信に失敗しました');

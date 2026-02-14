@@ -2,6 +2,7 @@
 // ドライバーLINE連携: registration_token検証 → line_user_id自動紐付け
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { checkRateLimit, getClientIp } from '../_shared/rate-limit.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -40,6 +41,16 @@ serve(async (req: Request) => {
   }
 
   try {
+    // レート制限: IP別 10req/60秒（連携は低頻度操作）
+    const clientIp = getClientIp(req);
+    const ipLimit = checkRateLimit(`ip:link:${clientIp}`, 10, 60_000);
+    if (!ipLimit.allowed) {
+      return new Response(JSON.stringify({ message: 'リクエスト数が上限を超えました。しばらく待ってから再度お試しください。' }), {
+        status: 429,
+        headers: { ...corsHeaders(origin), 'Content-Type': 'application/json', 'Retry-After': String(Math.ceil(ipLimit.retryAfterMs / 1000)) },
+      });
+    }
+
     // IDトークン検証
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {

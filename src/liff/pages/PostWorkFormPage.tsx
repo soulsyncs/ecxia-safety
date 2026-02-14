@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { FileText, Clock, CheckCircle, Plus, Trash2 } from 'lucide-react';
 import { isDemoMode } from '@/lib/supabase';
 import { useLiffAuth, submitToEdgeFunction } from '@/liff/hooks/use-liff-auth';
+import { useFormAutosave } from '@/liff/hooks/use-form-autosave';
 import { reportsService } from '@/services';
 import type { RestPeriod } from '@/types/database';
 
@@ -31,6 +32,8 @@ export function PostWorkFormPage() {
   const [restPeriods, setRestPeriods] = useState<RestPeriod[]>([
     { start: '12:00', end: '13:00', location: '' },
   ]);
+
+  const { clearSaved } = useFormAutosave('ecxia:post_work', form, setForm);
 
   const addRest = () => setRestPeriods(prev => [...prev, { start: '', end: '', location: '' }]);
   const removeRest = (i: number) => setRestPeriods(prev => prev.filter((_, idx) => idx !== i));
@@ -75,6 +78,7 @@ export function PostWorkFormPage() {
       } else {
         await submitToEdgeFunction('post_work', payload, idToken!);
       }
+      clearSaved();
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : '送信に失敗しました');

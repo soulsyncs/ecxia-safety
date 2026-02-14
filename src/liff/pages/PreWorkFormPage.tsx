@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Truck, Clock, CheckCircle } from 'lucide-react';
 import { isDemoMode } from '@/lib/supabase';
 import { useLiffAuth, submitToEdgeFunction } from '@/liff/hooks/use-liff-auth';
+import { useFormAutosave } from '@/liff/hooks/use-form-autosave';
 import { reportsService } from '@/services';
 
 export function PreWorkFormPage() {
@@ -30,6 +31,8 @@ export function PreWorkFormPage() {
     sleepHours: '7',
     cargoCount: '',
   });
+
+  const { clearSaved } = useFormAutosave('ecxia:pre_work', form, setForm);
 
   if (!driver || !vehicle) return null;
 
@@ -69,6 +72,7 @@ export function PreWorkFormPage() {
       } else {
         await submitToEdgeFunction('pre_work', payload, idToken!);
       }
+      clearSaved();
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : '送信に失敗しました');

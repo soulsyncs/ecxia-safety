@@ -49,4 +49,15 @@ async function update(id: string, input: UpdateDriverInput, organizationId: stri
   return fromDb<Driver>(data);
 }
 
-export const driversService = { list, getById, create, update };
+async function generateRegistrationToken(id: string, organizationId: string): Promise<string> {
+  const token = crypto.randomUUID();
+  if (isDemoMode) return token;
+
+  const { error } = await supabase.from('drivers').update({ registration_token: token })
+    .eq('id', id)
+    .eq('organization_id', organizationId);
+  if (error) handleSupabaseError(error);
+  return token;
+}
+
+export const driversService = { list, getById, create, update, generateRegistrationToken };

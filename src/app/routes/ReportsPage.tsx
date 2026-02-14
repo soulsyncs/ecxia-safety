@@ -1,18 +1,30 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useDrivers } from '@/hooks/use-drivers';
 import { useVehicles } from '@/hooks/use-vehicles';
 import { usePreWorkReports, usePostWorkReports, useDailyInspections, useAccidentReports } from '@/hooks/use-reports';
 import { useAuth } from '@/contexts/auth-context';
 
+const PAGE_SIZE = 20;
+
+function usePagination<T>(items: T[]) {
+  const [page, setPage] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const paginated = items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  return { page, totalPages, paginated, setPage, total: items.length };
+}
+
 export function ReportsPage() {
   const { organization } = useAuth();
   const orgId = organization?.id ?? '';
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]!);
+  const [filterDriverId, setFilterDriverId] = useState('');
 
   const { data: drivers = [] } = useDrivers(orgId);
   const { data: vehicles = [] } = useVehicles(orgId);
@@ -22,6 +34,19 @@ export function ReportsPage() {
   const { data: accidents = [], isLoading: loadingAcc } = useAccidentReports(orgId);
 
   const loading = loadingPre || loadingPost || loadingInsp || loadingAcc;
+
+  const filterBy = <T extends { driverId: string }>(items: T[]) =>
+    filterDriverId ? items.filter(r => r.driverId === filterDriverId) : items;
+
+  const filteredPre = useMemo(() => filterBy(preWork), [preWork, filterDriverId]);
+  const filteredPost = useMemo(() => filterBy(postWork), [postWork, filterDriverId]);
+  const filteredInsp = useMemo(() => filterBy(inspections), [inspections, filterDriverId]);
+  const filteredAcc = useMemo(() => filterBy(accidents), [accidents, filterDriverId]);
+
+  const prePag = usePagination(filteredPre);
+  const postPag = usePagination(filteredPost);
+  const inspPag = usePagination(filteredInsp);
+  const accPag = usePagination(filteredAcc);
 
   const driverName = (id: string) => drivers.find(d => d.id === id)?.name ?? '-';
   const vehiclePlate = (id: string) => vehicles.find(v => v.id === id)?.plateNumber ?? '-';
@@ -37,7 +62,19 @@ export function ReportsPage() {
           <h1 className="text-2xl font-bold">日報一覧</h1>
           <p className="text-muted-foreground">ドライバーの報告を日付別に確認</p>
         </div>
-        <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-44" />
+        <div className="flex items-center gap-2">
+          <select
+            value={filterDriverId}
+            onChange={e => setFilterDriverId(e.target.value)}
+            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+          >
+            <option value="">全ドライバー</option>
+            {drivers.map(d => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+          <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-44" />
+        </div>
       </div>
 
       {loading ? (
@@ -45,10 +82,10 @@ export function ReportsPage() {
       ) : (
         <Tabs defaultValue="pre-work">
           <TabsList className="mb-4">
-            <TabsTrigger value="pre-work">業務前報告 ({preWork.length})</TabsTrigger>
-            <TabsTrigger value="post-work">業務後報告 ({postWork.length})</TabsTrigger>
-            <TabsTrigger value="inspection">日常点検 ({inspections.length})</TabsTrigger>
-            <TabsTrigger value="accident">事故報告 ({accidents.length})</TabsTrigger>
+            <TabsTrigger value="pre-work">業務前報告 ({filteredPre.length})</TabsTrigger>
+            <TabsTrigger value="post-work">業務後報告 ({filteredPost.length})</TabsTrigger>
+            <TabsTrigger value="inspection">日常点検 ({filteredInsp.length})</TabsTrigger>
+            <TabsTrigger value="accident">事故報告 ({filteredAcc.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="pre-work">
@@ -68,7 +105,7 @@ export function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {preWork.map(r => (
+                    {prePag.paginated.map(r => (
                       <TableRow key={r.id}>
                         <TableCell className="font-medium">{driverName(r.driverId)}</TableCell>
                         <TableCell className="text-sm">{vehiclePlate(r.vehicleId)}</TableCell>
@@ -88,12 +125,21 @@ export function ReportsPage() {
                         <TableCell><Badge variant="outline">{r.submittedVia}</Badge></TableCell>
                       </TableRow>
                     ))}
-                    {preWork.length === 0 && (
+                    {filteredPre.length === 0 && (
                       <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">この日の業務前報告はありません</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
               </CardContent>
+              {prePag.totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 pb-4">
+                  <span className="text-sm text-muted-foreground">{prePag.total}件中 {prePag.page * PAGE_SIZE + 1}-{Math.min((prePag.page + 1) * PAGE_SIZE, prePag.total)}件</span>
+                  <div className="flex gap-1">
+                    <Button variant="outline" size="sm" disabled={prePag.page === 0} onClick={() => prePag.setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Button variant="outline" size="sm" disabled={prePag.page >= prePag.totalPages - 1} onClick={() => prePag.setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              )}
             </Card>
           </TabsContent>
 
@@ -113,7 +159,7 @@ export function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {postWork.map(r => (
+                    {postPag.paginated.map(r => (
                       <TableRow key={r.id}>
                         <TableCell className="font-medium">{driverName(r.driverId)}</TableCell>
                         <TableCell className="text-sm">{vehiclePlate(r.vehicleId)}</TableCell>
@@ -128,12 +174,21 @@ export function ReportsPage() {
                         <TableCell className="text-sm">{r.roadConditionNote ?? '特になし'}</TableCell>
                       </TableRow>
                     ))}
-                    {postWork.length === 0 && (
+                    {filteredPost.length === 0 && (
                       <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">この日の業務後報告はありません</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
               </CardContent>
+              {postPag.totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 pb-4">
+                  <span className="text-sm text-muted-foreground">{postPag.total}件中 {postPag.page * PAGE_SIZE + 1}-{Math.min((postPag.page + 1) * PAGE_SIZE, postPag.total)}件</span>
+                  <div className="flex gap-1">
+                    <Button variant="outline" size="sm" disabled={postPag.page === 0} onClick={() => postPag.setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Button variant="outline" size="sm" disabled={postPag.page >= postPag.totalPages - 1} onClick={() => postPag.setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              )}
             </Card>
           </TabsContent>
 
@@ -154,7 +209,7 @@ export function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {inspections.map(r => (
+                    {inspPag.paginated.map(r => (
                       <TableRow key={r.id}>
                         <TableCell className="font-medium">{driverName(r.driverId)}</TableCell>
                         <TableCell className="text-sm">{vehiclePlate(r.vehicleId)}</TableCell>
@@ -170,12 +225,21 @@ export function ReportsPage() {
                         <TableCell className="text-sm">{r.abnormalityNote ?? '-'}</TableCell>
                       </TableRow>
                     ))}
-                    {inspections.length === 0 && (
+                    {filteredInsp.length === 0 && (
                       <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">この日の日常点検はありません</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
               </CardContent>
+              {inspPag.totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 pb-4">
+                  <span className="text-sm text-muted-foreground">{inspPag.total}件中 {inspPag.page * PAGE_SIZE + 1}-{Math.min((inspPag.page + 1) * PAGE_SIZE, inspPag.total)}件</span>
+                  <div className="flex gap-1">
+                    <Button variant="outline" size="sm" disabled={inspPag.page === 0} onClick={() => inspPag.setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Button variant="outline" size="sm" disabled={inspPag.page >= inspPag.totalPages - 1} onClick={() => inspPag.setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              )}
             </Card>
           </TabsContent>
 
@@ -195,7 +259,7 @@ export function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {accidents.map(r => (
+                    {accPag.paginated.map(r => (
                       <TableRow key={r.id}>
                         <TableCell className="text-sm">{new Date(r.occurredAt).toLocaleString('ja-JP')}</TableCell>
                         <TableCell className="font-medium">{driverName(r.driverId)}</TableCell>
@@ -218,12 +282,21 @@ export function ReportsPage() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {accidents.length === 0 && (
+                    {filteredAcc.length === 0 && (
                       <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">事故報告はありません</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
               </CardContent>
+              {accPag.totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 pb-4">
+                  <span className="text-sm text-muted-foreground">{accPag.total}件中 {accPag.page * PAGE_SIZE + 1}-{Math.min((accPag.page + 1) * PAGE_SIZE, accPag.total)}件</span>
+                  <div className="flex gap-1">
+                    <Button variant="outline" size="sm" disabled={accPag.page === 0} onClick={() => accPag.setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Button variant="outline" size="sm" disabled={accPag.page >= accPag.totalPages - 1} onClick={() => accPag.setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              )}
             </Card>
           </TabsContent>
         </Tabs>

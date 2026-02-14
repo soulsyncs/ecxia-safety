@@ -2,6 +2,7 @@
 // LIFF経由のレポート送信を処理（IDトークン検証 → ドライバー特定 → DB INSERT）
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { checkRateLimit, getClientIp } from '../_shared/rate-limit.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -158,6 +159,16 @@ serve(async (req: Request) => {
   }
 
   try {
+    // レート制限: IP別 30req/60秒
+    const clientIp = getClientIp(req);
+    const ipLimit = checkRateLimit(`ip:${clientIp}`, 30, 60_000);
+    if (!ipLimit.allowed) {
+      return new Response(JSON.stringify({ message: 'リクエスト数が上限を超えました。しばらく待ってから再度お試しください。' }), {
+        status: 429,
+        headers: { ...corsHeaders(origin), 'Content-Type': 'application/json', 'Retry-After': String(Math.ceil(ipLimit.retryAfterMs / 1000)) },
+      });
+    }
+
     // IDトークン取得
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -235,6 +246,33 @@ serve(async (req: Request) => {
       }
 
       const result = await insertReport(table, safePayload);
+
+      // 事故報告の写真アップロード処理
+      if (type === 'accident' && Array.isArray(body.photos) && body.photos.length > 0 && result.id) {
+        const photos = body.photos.slice(0, 5); // 最大5枚
+        for (const photo of photos) {
+          if (typeof photo.base64 !== 'string' || typeof photo.mimeType !== 'string') continue;
+          if (!photo.mimeType.startsWith('image/')) continue;
+          const bytes = Uint8Array.from(atob(photo.base64), c => c.charCodeAt(0));
+          if (bytes.length > 10 * 1024 * 1024) continue; // 10MBリミット
+          const ext = photo.mimeType === 'image/png' ? 'png' : 'jpg';
+          const path = `${driverRow.organization_id}/${result.id}/${crypto.randomUUID()}.${ext}`;
+          const { error: uploadError } = await supabase.storage.from('accident-photos').upload(path, bytes, {
+            contentType: photo.mimeType,
+          });
+          if (!uploadError) {
+            await supabase.from('accident_photos').insert({
+              organization_id: driverRow.organization_id,
+              accident_report_id: result.id,
+              storage_path: path,
+              mime_type: photo.mimeType,
+              file_size_bytes: bytes.length,
+              uploaded_by: driverRow.id,
+            });
+          }
+        }
+      }
+
       return new Response(JSON.stringify({ success: true, data: result }), {
         headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
       });

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
-import { useDrivers, useCreateDriver, useUpdateDriver } from '@/hooks/use-drivers';
+import { useDrivers, useCreateDriver, useUpdateDriver, useGenerateToken } from '@/hooks/use-drivers';
+import { QRCodeSVG } from 'qrcode.react';
 import { useVehicles } from '@/hooks/use-vehicles';
 import { useAuth } from '@/contexts/auth-context';
 import { createDriverSchema, type CreateDriverInput, type UpdateDriverInput } from '@/lib/validations';
@@ -29,10 +30,13 @@ export function DriversPage() {
   const { data: vehicles = [] } = useVehicles(orgId);
   const createDriver = useCreateDriver();
   const updateDriver = useUpdateDriver();
+  const generateToken = useGenerateToken();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDriver, setEditDriver] = useState<Driver | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [linkDriver, setLinkDriver] = useState<Driver | null>(null);
+  const [linkUrl, setLinkUrl] = useState<string | null>(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateDriverInput>({
     resolver: zodResolver(createDriverSchema),
@@ -79,6 +83,19 @@ export function DriversPage() {
       await updateDriver.mutateAsync({ id: editDriver.id, input, organizationId: organization.id });
       setEditDialogOpen(false);
       setEditDriver(null);
+    } catch {
+      // error handled by mutation
+    }
+  };
+
+  const handleLinkLine = async (driver: Driver) => {
+    if (!organization) return;
+    try {
+      const token = await generateToken.mutateAsync({ id: driver.id, organizationId: organization.id });
+      const liffId = import.meta.env.VITE_LIFF_ID ?? '';
+      const url = `https://liff.line.me/${liffId}/link?token=${token}`;
+      setLinkUrl(url);
+      setLinkDriver(driver);
     } catch {
       // error handled by mutation
     }
@@ -181,10 +198,10 @@ export function DriversPage() {
                     <TableCell>
                       {driver.lineUserId ? (
                         <Badge variant="default" className="bg-ecxia-green">連携済</Badge>
-                      ) : driver.registrationToken ? (
-                        <Badge variant="secondary">登録待ち</Badge>
                       ) : (
-                        <Badge variant="outline">未連携</Badge>
+                        <Button variant="outline" size="sm" onClick={() => handleLinkLine(driver)} disabled={generateToken.isPending}>
+                          <Link2 className="h-3 w-3 mr-1" />LINE連携
+                        </Button>
                       )}
                     </TableCell>
                     <TableCell>
@@ -224,6 +241,26 @@ export function DriversPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={!!linkDriver} onOpenChange={open => { if (!open) { setLinkDriver(null); setLinkUrl(null); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>LINE連携 - {linkDriver?.name}</DialogTitle></DialogHeader>
+          {linkUrl && (
+            <div className="flex flex-col items-center gap-4 py-4">
+              <p className="text-sm text-muted-foreground text-center">ドライバーにこのQRコードを読み取ってもらうか、URLを送信してください。</p>
+              <QRCodeSVG value={linkUrl} size={200} />
+              <div className="w-full">
+                <Label className="text-xs">登録URL</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input value={linkUrl} readOnly className="text-xs" />
+                  <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(linkUrl)}>コピー</Button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">このURLは1回限り有効です。連携完了後は無効になります。</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>

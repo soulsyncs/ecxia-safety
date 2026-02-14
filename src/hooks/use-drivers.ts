@@ -39,3 +39,14 @@ export function useUpdateDriver() {
     },
   });
 }
+
+export function useGenerateToken() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, organizationId }: { id: string; organizationId: string }) =>
+      driversService.generateRegistrationToken(id, organizationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['drivers'] });
+    },
+  });
+}

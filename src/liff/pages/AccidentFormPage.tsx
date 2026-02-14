@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Camera, X } from 'lucide-react';
 import { isDemoMode } from '@/lib/supabase';
 import { useLiffAuth, submitToEdgeFunction } from '@/liff/hooks/use-liff-auth';
+import { useFormAutosave } from '@/liff/hooks/use-form-autosave';
 import { reportsService } from '@/services';
 
 export function AccidentFormPage() {
@@ -14,6 +15,8 @@ export function AccidentFormPage() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<Array<{ file: File; preview: string; base64: string; mimeType: string }>>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     location: '',
@@ -23,7 +26,38 @@ export function AccidentFormPage() {
     hasInjuries: false,
     injuryDetails: '',
     isSerious: false,
+    counterpartyInfo: '',
+    policeReported: false,
+    insuranceContacted: false,
+    notes: '',
   });
+
+  const { clearSaved } = useFormAutosave('ecxia:accident', form, setForm);
+
+  const handlePhotoAdd = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/') || photos.length >= 5) continue;
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1] ?? '');
+        };
+        reader.readAsDataURL(file);
+      });
+      setPhotos(prev => [...prev.slice(0, 4), { file, preview: URL.createObjectURL(file), base64, mimeType: file.type }]);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos(prev => {
+      URL.revokeObjectURL(prev[index]!.preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
 
   if (!driver) return null;
 
@@ -48,6 +82,10 @@ export function AccidentFormPage() {
         hasInjuries: form.hasInjuries,
         injuryDetails: form.hasInjuries ? form.injuryDetails : null,
         isSerious: form.isSerious,
+        counterpartyInfo: form.counterpartyInfo || null,
+        policeReported: form.policeReported,
+        insuranceContacted: form.insuranceContacted,
+        notes: form.notes || null,
         reportedToMlit: false,
         reportedToMlitAt: null,
         mlitReportDeadline: form.isSerious
@@ -66,8 +104,12 @@ export function AccidentFormPage() {
           updatedAt: occurredAt,
         } as Parameters<typeof reportsService.submitAccidentReport>[0]);
       } else {
-        await submitToEdgeFunction('accident', payload, idToken!);
+        const photoData = photos.length > 0
+          ? { photos: photos.map(p => ({ base64: p.base64, mimeType: p.mimeType })) }
+          : undefined;
+        await submitToEdgeFunction('accident', payload, idToken!, photoData);
       }
+      clearSaved();
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : '送信に失敗しました');
@@ -149,6 +191,66 @@ export function AccidentFormPage() {
             <div className="p-3 bg-red-50 rounded-lg text-sm text-red-800">
               重大事故の場合、国土交通大臣への報告が必要です（速報24時間以内、本報30日以内）。管理者に自動通知されます。
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">対応状況</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1">
+            <Label className="text-xs">相手方情報</Label>
+            <Textarea value={form.counterpartyInfo} onChange={e => setForm(f => ({...f, counterpartyInfo: e.target.value}))} placeholder="相手方の氏名、車両、連絡先など" rows={2} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">警察への届出</Label>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant={!form.policeReported ? 'outline' : 'default'} onClick={() => setForm(f => ({...f, policeReported: true}))} className="flex-1">届出済み</Button>
+              <Button type="button" size="sm" variant={form.policeReported ? 'outline' : 'default'} onClick={() => setForm(f => ({...f, policeReported: false}))} className="flex-1">未届出</Button>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">保険会社への連絡</Label>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant={!form.insuranceContacted ? 'outline' : 'default'} onClick={() => setForm(f => ({...f, insuranceContacted: true}))} className="flex-1">連絡済み</Button>
+              <Button type="button" size="sm" variant={form.insuranceContacted ? 'outline' : 'default'} onClick={() => setForm(f => ({...f, insuranceContacted: false}))} className="flex-1">未連絡</Button>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">備考</Label>
+            <Textarea value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} placeholder="その他特記事項" rows={2} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">事故写真（最大5枚）</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            capture="environment"
+            className="hidden"
+            onChange={handlePhotoAdd}
+          />
+          {photos.length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {photos.map((photo, i) => (
+                <div key={i} className="relative">
+                  <img src={photo.preview} alt={`写真${i + 1}`} className="w-full h-20 object-cover rounded" />
+                  <button type="button" onClick={() => removePhoto(i)} className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full p-0.5">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {photos.length < 5 && (
+            <Button type="button" variant="outline" className="w-full" onClick={() => fileInputRef.current?.click()}>
+              <Camera className="h-4 w-4 mr-2" />写真を追加
+            </Button>
           )}
         </CardContent>
       </Card>
