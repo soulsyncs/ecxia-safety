@@ -3,6 +3,14 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 // デモモード判定: 環境変数未設定時はdemo-storeにフォールバック
 export const isDemoMode = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// 本番ビルドでのデモモード起動を防止（環境変数忘れ検知）
+if (isDemoMode && import.meta.env.PROD) {
+  throw new Error(
+    'FATAL: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set in production. ' +
+    'Demo mode is not allowed in production builds.'
+  );
+}
+
 // Supabaseクライアント（デモモード時はダミー）
 export const supabase: SupabaseClient = isDemoMode
   ? (null as unknown as SupabaseClient) // デモモードではサービス層でdemo-storeを使う

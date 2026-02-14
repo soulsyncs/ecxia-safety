@@ -61,29 +61,30 @@ async function getVehicle(vehicleId: string | null) {
 // --- 入力ホワイトリスト: レポート種別ごとの許可フィールド ---
 const ALLOWED_FIELDS: Record<string, string[]> = {
   pre_work: [
-    'reportDate', 'vehicleId', 'clockInAt', 'departurePoint',
+    'reportDate', 'vehicleId', 'clockInAt', 'startLocation',
+    'plannedDestinations', 'cargoCount',
     'alcoholCheckResult', 'alcoholCheckValue', 'alcoholCheckerName',
-    'healthCondition', 'fatigueLevel', 'sleepHours', 'sleepSufficient',
-    'illnessNote', 'routeInfo', 'notes',
+    'healthCondition', 'healthConditionNote', 'fatigueLevel', 'sleepHours',
   ],
   post_work: [
-    'reportDate', 'vehicleId', 'clockOutAt', 'arrivalPoint',
-    'distanceKm', 'cargoDeliveredCount', 'restPeriods',
+    'reportDate', 'vehicleId', 'clockOutAt', 'endLocation',
+    'actualDestinations', 'distanceKm', 'cargoDeliveredCount', 'restPeriods',
     'alcoholCheckResult', 'alcoholCheckValue', 'alcoholCheckerName',
-    'roadConditionNote', 'vehicleConditionNote', 'notes',
+    'roadConditionNote',
   ],
   inspection: [
     'inspectionDate', 'vehicleId',
-    'engineOil', 'coolantLevel', 'battery', 'fanBelt',
-    'headlights', 'turnSignals', 'brakeLights', 'hazardLights',
+    'engineOil', 'coolantLevel', 'battery',
+    'headlights', 'turnSignals', 'brakeLights',
     'tirePressure', 'tireTread', 'tireDamage',
     'mirrors', 'seatbelt', 'brakes', 'steering',
-    'allPassed', 'abnormalityNote', 'notes',
+    'allPassed', 'abnormalityNote',
   ],
   accident: [
     'occurredAt', 'vehicleId', 'location', 'latitude', 'longitude',
     'summary', 'cause', 'preventionMeasures',
     'hasInjuries', 'injuryDetails', 'isSerious',
+    'reportedToMlit', 'reportedToMlitAt', 'mlitReportDeadline',
     'counterpartyInfo', 'policeReported', 'insuranceContacted',
     'notes', 'status',
   ],
@@ -102,7 +103,7 @@ function sanitizePayload(type: string, data: Record<string, unknown>): Record<st
   return result;
 }
 
-/** レポートをDBに保存 */
+/** レポートをDBに保存（daily_inspectionsは同日再送信=UPSERT） */
 async function insertReport(table: string, payload: Record<string, unknown>) {
   // camelCase → snake_case 変換
   const snakePayload: Record<string, unknown> = {};
@@ -117,6 +118,24 @@ async function insertReport(table: string, payload: Record<string, unknown>) {
   const expiresAt = new Date(now);
   expiresAt.setFullYear(expiresAt.getFullYear() + retentionYears);
   snakePayload['expires_at'] = expiresAt.toISOString().split('T')[0];
+
+  // UNIQUE制約のあるテーブルは同日再送信=UPSERT（横展開: 3テーブル共通パターン）
+  const UPSERT_CONFLICT: Record<string, string> = {
+    pre_work_reports: 'driver_id,report_date',
+    post_work_reports: 'driver_id,report_date',
+    daily_inspections: 'driver_id,inspection_date',
+  };
+
+  const conflictKey = UPSERT_CONFLICT[table];
+  if (conflictKey) {
+    const { data, error } = await supabase
+      .from(table)
+      .upsert(snakePayload, { onConflict: conflictKey })
+      .select()
+      .single();
+    if (error) throw new Error(`DB upsert failed: ${error.message}`);
+    return data;
+  }
 
   const { data, error } = await supabase.from(table).insert(snakePayload).select().single();
   if (error) throw new Error(`DB insert failed: ${error.message}`);
@@ -205,12 +224,15 @@ serve(async (req: Request) => {
       const sanitized = sanitizePayload(type, data ?? {});
 
       // organization_idとdriver_idはサーバー側で上書き（改竄防止）
-      const safePayload = {
+      // accident_reportsにはsubmitted_viaカラムが存在しないため除外
+      const safePayload: Record<string, unknown> = {
         ...sanitized,
         organizationId: driverRow.organization_id,
         driverId: driverRow.id,
-        submittedVia: 'liff',
       };
+      if (type !== 'accident') {
+        safePayload.submittedVia = 'liff';
+      }
 
       const result = await insertReport(table, safePayload);
       return new Response(JSON.stringify({ success: true, data: result }), {

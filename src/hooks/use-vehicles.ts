@@ -10,11 +10,11 @@ export function useVehicles(organizationId: string) {
   });
 }
 
-export function useVehicle(id: string) {
+export function useVehicle(id: string, organizationId: string) {
   return useQuery({
-    queryKey: ['vehicles', 'detail', id],
-    queryFn: () => vehiclesService.getById(id),
-    enabled: !!id,
+    queryKey: ['vehicles', 'detail', id, organizationId],
+    queryFn: () => vehiclesService.getById(id, organizationId),
+    enabled: !!id && !!organizationId,
   });
 }
 
@@ -32,8 +32,8 @@ export function useCreateVehicle() {
 export function useUpdateVehicle() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UpdateVehicleInput }) =>
-      vehiclesService.update(id, input),
+    mutationFn: ({ id, input, organizationId }: { id: string; input: UpdateVehicleInput; organizationId: string }) =>
+      vehiclesService.update(id, input, organizationId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vehicles'] });
     },

@@ -10,11 +10,11 @@ export function useDrivers(organizationId: string) {
   });
 }
 
-export function useDriver(id: string) {
+export function useDriver(id: string, organizationId: string) {
   return useQuery({
-    queryKey: ['drivers', 'detail', id],
-    queryFn: () => driversService.getById(id),
-    enabled: !!id,
+    queryKey: ['drivers', 'detail', id, organizationId],
+    queryFn: () => driversService.getById(id, organizationId),
+    enabled: !!id && !!organizationId,
   });
 }
 
@@ -32,8 +32,8 @@ export function useCreateDriver() {
 export function useUpdateDriver() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UpdateDriverInput }) =>
-      driversService.update(id, input),
+    mutationFn: ({ id, input, organizationId }: { id: string; input: UpdateDriverInput; organizationId: string }) =>
+      driversService.update(id, input, organizationId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['drivers'] });
     },

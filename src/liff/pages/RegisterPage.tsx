@@ -6,6 +6,35 @@ const EDGE_FUNCTION_BASE = import.meta.env.VITE_SUPABASE_URL
   ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
   : '';
 
+/** LIFFのURL処理を考慮してregistration tokenを抽出 */
+function extractToken(): string | null {
+  // 1. 通常のクエリパラメータ
+  const params = new URLSearchParams(window.location.search);
+  const direct = params.get('token');
+  if (direct) return direct;
+
+  // 2. liff.stateにエンコードされている場合
+  //    liff.state=/register?token=xxx or liff.state=?token=xxx
+  const liffState = params.get('liff.state') ?? params.get('liff_state');
+  if (liffState) {
+    const stateQuery = liffState.includes('?') ? liffState.split('?')[1] : null;
+    if (stateQuery) {
+      const stateParams = new URLSearchParams(stateQuery);
+      const fromState = stateParams.get('token');
+      if (fromState) return fromState;
+    }
+  }
+
+  // 3. ハッシュフラグメント内
+  if (window.location.hash) {
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const fromHash = hashParams.get('token');
+    if (fromHash) return fromHash;
+  }
+
+  return null;
+}
+
 export function RegisterPage() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('LINE連携を開始しています...');
@@ -16,9 +45,13 @@ export function RegisterPage() {
 
     async function register() {
       try {
+        // LIFF初期化を先に行う（liff.stateの解決後にURLパラメータを読む）
+        await initLiff();
+
         // URLからregistration_tokenを取得
-        const params = new URLSearchParams(window.location.search);
-        const token = params.get('token');
+        // LIFFはOAuthリダイレクト時にクエリパラメータをliff.stateにエンコードする場合がある
+        // initLiff()後にwindow.locationが更新されるため、ここで読む
+        const token = extractToken();
         if (!token) {
           if (!cancelled) {
             setStatus('error');
@@ -26,9 +59,6 @@ export function RegisterPage() {
           }
           return;
         }
-
-        // LIFF初期化
-        await initLiff();
         const idToken = getLiffIdToken();
         if (!idToken) {
           if (!cancelled) {

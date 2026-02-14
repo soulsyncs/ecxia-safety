@@ -13,6 +13,7 @@ export function AccidentFormPage() {
   const { driver, vehicle, idToken } = useLiffAuth();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     location: '',
@@ -69,7 +70,7 @@ export function AccidentFormPage() {
       }
       setSubmitted(true);
     } catch (err) {
-      console.error('Failed to submit accident report:', err);
+      setError(err instanceof Error ? err.message : '送信に失敗しました');
     } finally {
       setSubmitting(false);
     }
@@ -151,6 +152,10 @@ export function AccidentFormPage() {
           )}
         </CardContent>
       </Card>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">{error}</div>
+      )}
 
       <Button type="submit" className="w-full h-12 text-base bg-red-600 hover:bg-red-700 text-white" disabled={submitting}>
         {submitting ? '送信中...' : '事故報告を提出'}

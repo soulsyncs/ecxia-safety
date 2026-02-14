@@ -39,6 +39,7 @@ export function InspectionFormPage() {
   const { driver, vehicle, idToken } = useLiffAuth();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [checks, setChecks] = useState<CheckState>({});
   const [abnormalityNote, setAbnormalityNote] = useState('');
   const today = new Date().toISOString().split('T')[0]!;
@@ -103,7 +104,7 @@ export function InspectionFormPage() {
       }
       setSubmitted(true);
     } catch (err) {
-      console.error('Failed to submit inspection:', err);
+      setError(err instanceof Error ? err.message : '送信に失敗しました');
     } finally {
       setSubmitting(false);
     }
@@ -182,6 +183,10 @@ export function InspectionFormPage() {
             />
           </CardContent>
         </Card>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">{error}</div>
       )}
 
       <Button

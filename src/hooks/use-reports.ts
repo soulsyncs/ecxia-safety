@@ -1,26 +1,26 @@
 import { useQuery } from '@tanstack/react-query';
 import { reportsService } from '@/services';
 
-export function usePreWorkReports(organizationId: string, date?: string) {
+export function usePreWorkReports(organizationId: string, startDate?: string, endDate?: string) {
   return useQuery({
-    queryKey: ['reports', 'pre-work', organizationId, date],
-    queryFn: () => reportsService.getPreWorkReports(organizationId, date),
+    queryKey: ['reports', 'pre-work', organizationId, startDate, endDate],
+    queryFn: () => reportsService.getPreWorkReports(organizationId, startDate, endDate),
     enabled: !!organizationId,
   });
 }
 
-export function usePostWorkReports(organizationId: string, date?: string) {
+export function usePostWorkReports(organizationId: string, startDate?: string, endDate?: string) {
   return useQuery({
-    queryKey: ['reports', 'post-work', organizationId, date],
-    queryFn: () => reportsService.getPostWorkReports(organizationId, date),
+    queryKey: ['reports', 'post-work', organizationId, startDate, endDate],
+    queryFn: () => reportsService.getPostWorkReports(organizationId, startDate, endDate),
     enabled: !!organizationId,
   });
 }
 
-export function useDailyInspections(organizationId: string, date?: string) {
+export function useDailyInspections(organizationId: string, startDate?: string, endDate?: string) {
   return useQuery({
-    queryKey: ['reports', 'inspections', organizationId, date],
-    queryFn: () => reportsService.getDailyInspections(organizationId, date),
+    queryKey: ['reports', 'inspections', organizationId, startDate, endDate],
+    queryFn: () => reportsService.getDailyInspections(organizationId, startDate, endDate),
     enabled: !!organizationId,
   });
 }

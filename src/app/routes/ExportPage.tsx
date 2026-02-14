@@ -55,9 +55,9 @@ export function ExportPage() {
   const { organization } = useAuth();
   const orgId = organization?.id ?? '';
   const { data: drivers = [] } = useDrivers(orgId);
-  const { data: preWork = [] } = usePreWorkReports(orgId, startDate);
-  const { data: postWork = [] } = usePostWorkReports(orgId, startDate);
-  const { data: inspections = [] } = useDailyInspections(orgId, startDate);
+  const { data: preWork = [] } = usePreWorkReports(orgId, startDate, endDate);
+  const { data: postWork = [] } = usePostWorkReports(orgId, startDate, endDate);
+  const { data: inspections = [] } = useDailyInspections(orgId, startDate, endDate);
   const { data: accidents = [] } = useAccidentReports(orgId);
 
   const driverName = (id: string) => drivers.find(d => d.id === id)?.name ?? '-';
@@ -70,23 +70,20 @@ export function ExportPage() {
     let filename = '';
 
     if (type === 'pre_work') {
-      const filtered = preWork.filter(r => r.reportDate >= startDate && r.reportDate <= endDate);
       csv = '日付,ドライバー,出勤時刻,アルコール結果,測定値,確認者,体調,疲労度,睡眠時間,提出方法\n';
-      for (const r of filtered) {
+      for (const r of preWork) {
         csv += [r.reportDate, escapeCsv(driverName(r.driverId)), r.clockInAt, r.alcoholCheckResult, r.alcoholCheckValue ?? '', escapeCsv(r.alcoholCheckerName), r.healthCondition, r.fatigueLevel, r.sleepHours ?? '', r.submittedVia].join(',') + '\n';
       }
       filename = `業務前報告_${startDate}_${endDate}.csv`;
     } else if (type === 'post_work') {
-      const filtered = postWork.filter(r => r.reportDate >= startDate && r.reportDate <= endDate);
       csv = '日付,ドライバー,退勤時刻,走行距離km,配送数,アルコール結果,道路状況\n';
-      for (const r of filtered) {
+      for (const r of postWork) {
         csv += [r.reportDate, escapeCsv(driverName(r.driverId)), r.clockOutAt, r.distanceKm, r.cargoDeliveredCount ?? '', r.alcoholCheckResult, escapeCsv(r.roadConditionNote)].join(',') + '\n';
       }
       filename = `業務後報告_${startDate}_${endDate}.csv`;
     } else if (type === 'inspection') {
-      const filtered = inspections.filter(r => r.inspectionDate >= startDate && r.inspectionDate <= endDate);
       csv = '日付,ドライバー,全項目合格,異常メモ\n';
-      for (const r of filtered) {
+      for (const r of inspections) {
         csv += [r.inspectionDate, escapeCsv(driverName(r.driverId)), r.allPassed ? 'OK' : 'NG', escapeCsv(r.abnormalityNote)].join(',') + '\n';
       }
       filename = `日常点検_${startDate}_${endDate}.csv`;

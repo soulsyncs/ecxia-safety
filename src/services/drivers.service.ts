@@ -14,10 +14,13 @@ async function list(organizationId: string): Promise<Driver[]> {
   return fromDbArray<Driver>(data ?? []);
 }
 
-async function getById(id: string): Promise<Driver | undefined> {
+async function getById(id: string, organizationId: string): Promise<Driver | undefined> {
   if (isDemoMode) return demoDriverService.getById(id);
 
-  const { data, error } = await supabase.from('drivers').select('*').eq('id', id).single();
+  const { data, error } = await supabase.from('drivers').select('*')
+    .eq('id', id)
+    .eq('organization_id', organizationId)
+    .single();
   if (error) {
     if (error.code === 'PGRST116') return undefined;
     handleSupabaseError(error);
@@ -34,11 +37,14 @@ async function create(input: CreateDriverInput, organizationId: string): Promise
   return fromDb<Driver>(data);
 }
 
-async function update(id: string, input: UpdateDriverInput): Promise<Driver> {
+async function update(id: string, input: UpdateDriverInput, organizationId: string): Promise<Driver> {
   if (isDemoMode) return demoDriverService.update(id, input as Partial<Driver>);
 
   const dbRow = toDb(input as Record<string, unknown>);
-  const { data, error } = await supabase.from('drivers').update(dbRow).eq('id', id).select().single();
+  const { data, error } = await supabase.from('drivers').update(dbRow)
+    .eq('id', id)
+    .eq('organization_id', organizationId)
+    .select().single();
   if (error) handleSupabaseError(error);
   return fromDb<Driver>(data);
 }

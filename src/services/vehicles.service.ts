@@ -14,10 +14,13 @@ async function list(organizationId: string): Promise<Vehicle[]> {
   return fromDbArray<Vehicle>(data ?? []);
 }
 
-async function getById(id: string): Promise<Vehicle | undefined> {
+async function getById(id: string, organizationId: string): Promise<Vehicle | undefined> {
   if (isDemoMode) return demoVehicleService.getById(id);
 
-  const { data, error } = await supabase.from('vehicles').select('*').eq('id', id).single();
+  const { data, error } = await supabase.from('vehicles').select('*')
+    .eq('id', id)
+    .eq('organization_id', organizationId)
+    .single();
   if (error) {
     if (error.code === 'PGRST116') return undefined;
     handleSupabaseError(error);
@@ -34,11 +37,14 @@ async function create(input: CreateVehicleInput, organizationId: string): Promis
   return fromDb<Vehicle>(data);
 }
 
-async function update(id: string, input: UpdateVehicleInput): Promise<Vehicle> {
+async function update(id: string, input: UpdateVehicleInput, organizationId: string): Promise<Vehicle> {
   if (isDemoMode) return demoVehicleService.update(id, input as Partial<Vehicle>);
 
   const dbRow = toDb(input as Record<string, unknown>);
-  const { data, error } = await supabase.from('vehicles').update(dbRow).eq('id', id).select().single();
+  const { data, error } = await supabase.from('vehicles').update(dbRow)
+    .eq('id', id)
+    .eq('organization_id', organizationId)
+    .select().single();
   if (error) handleSupabaseError(error);
   return fromDb<Vehicle>(data);
 }

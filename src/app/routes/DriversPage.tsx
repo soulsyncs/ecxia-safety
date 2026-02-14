@@ -1,18 +1,20 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
-import { useDrivers, useCreateDriver } from '@/hooks/use-drivers';
+import { useDrivers, useCreateDriver, useUpdateDriver } from '@/hooks/use-drivers';
 import { useVehicles } from '@/hooks/use-vehicles';
 import { useAuth } from '@/contexts/auth-context';
-import { createDriverSchema, type CreateDriverInput } from '@/lib/validations';
+import { createDriverSchema, type CreateDriverInput, type UpdateDriverInput } from '@/lib/validations';
+import type { Driver } from '@/types/database';
 
 const statusLabel: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' }> = {
   active: { label: '稼働中', variant: 'default' },
@@ -26,8 +28,11 @@ export function DriversPage() {
   const { data: drivers = [], isLoading } = useDrivers(orgId);
   const { data: vehicles = [] } = useVehicles(orgId);
   const createDriver = useCreateDriver();
+  const updateDriver = useUpdateDriver();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDriver, setEditDriver] = useState<Driver | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateDriverInput>({
     resolver: zodResolver(createDriverSchema),
@@ -49,6 +54,40 @@ export function DriversPage() {
       await createDriver.mutateAsync({ input: data, organizationId: organization.id });
       setDialogOpen(false);
       reset();
+    } catch {
+      // error handled by mutation
+    }
+  };
+
+  const handleEdit = (driver: Driver) => {
+    setEditDriver(driver);
+    setEditDialogOpen(true);
+  };
+
+  const onEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editDriver || !organization) return;
+    const formData = new FormData(e.currentTarget);
+    const input: UpdateDriverInput = {
+      name: formData.get('editName') as string,
+      nameKana: (formData.get('editNameKana') as string) || undefined,
+      phone: (formData.get('editPhone') as string) || undefined,
+      dateOfBirth: (formData.get('editDateOfBirth') as string) || undefined,
+      licenseNumber: (formData.get('editLicenseNumber') as string) || undefined,
+    };
+    try {
+      await updateDriver.mutateAsync({ id: editDriver.id, input, organizationId: organization.id });
+      setEditDialogOpen(false);
+      setEditDriver(null);
+    } catch {
+      // error handled by mutation
+    }
+  };
+
+  const handleSoftDelete = async (driver: Driver) => {
+    if (!organization) return;
+    try {
+      await updateDriver.mutateAsync({ id: driver.id, input: { status: 'inactive' }, organizationId: organization.id });
     } catch {
       // error handled by mutation
     }
@@ -123,6 +162,7 @@ export function DriversPage() {
                 <TableHead>LINE連携</TableHead>
                 <TableHead>状態</TableHead>
                 <TableHead>入社日</TableHead>
+                <TableHead>操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -151,6 +191,32 @@ export function DriversPage() {
                       <Badge variant={st.variant}>{st.label}</Badge>
                     </TableCell>
                     <TableCell className="text-sm">{driver.hireDate ?? '-'}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(driver)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>ドライバーを退職にしますか？</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                {driver.name} を退職状態にします。一覧から非表示になります。
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleSoftDelete(driver)}>退職にする</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -158,6 +224,39 @@ export function DriversPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>ドライバー編集</DialogTitle></DialogHeader>
+          {editDriver && (
+            <form onSubmit={onEditSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="editName">氏名 *</Label>
+                <Input id="editName" name="editName" defaultValue={editDriver.name} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editNameKana">フリガナ</Label>
+                <Input id="editNameKana" name="editNameKana" defaultValue={editDriver.nameKana ?? ''} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editPhone">電話番号</Label>
+                <Input id="editPhone" name="editPhone" defaultValue={editDriver.phone ?? ''} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editDateOfBirth">生年月日</Label>
+                <Input id="editDateOfBirth" name="editDateOfBirth" type="date" defaultValue={editDriver.dateOfBirth ?? ''} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editLicenseNumber">免許証番号</Label>
+                <Input id="editLicenseNumber" name="editLicenseNumber" defaultValue={editDriver.licenseNumber ?? ''} />
+              </div>
+              <Button type="submit" className="w-full" disabled={updateDriver.isPending}>
+                {updateDriver.isPending ? '更新中...' : '更新'}
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

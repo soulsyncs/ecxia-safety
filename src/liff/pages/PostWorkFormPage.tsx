@@ -15,6 +15,7 @@ export function PostWorkFormPage() {
   const { driver, vehicle, idToken } = useLiffAuth();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const now = new Date();
   const today = now.toISOString().split('T')[0]!;
 
@@ -76,7 +77,7 @@ export function PostWorkFormPage() {
       }
       setSubmitted(true);
     } catch (err) {
-      console.error('Failed to submit post-work report:', err);
+      setError(err instanceof Error ? err.message : '送信に失敗しました');
     } finally {
       setSubmitting(false);
     }
@@ -200,6 +201,10 @@ export function PostWorkFormPage() {
           </div>
         </CardContent>
       </Card>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">{error}</div>
+      )}
 
       <Button type="submit" className="w-full h-12 text-base rounded-full bg-ecxia-green hover:bg-ecxia-green-dark" disabled={submitting}>
         {submitting ? '送信中...' : '業務後報告を提出'}
