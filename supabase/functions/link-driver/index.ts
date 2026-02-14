@@ -139,8 +139,8 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : '内部エラーが発生しました';
-    return new Response(JSON.stringify({ message }), {
+    console.error('link-driver error:', err instanceof Error ? err.message : 'Unknown error');
+    return new Response(JSON.stringify({ message: '内部エラーが発生しました。しばらく経ってから再度お試しください。' }), {
       status: 500, headers: { ...corsHeaders(req.headers.get('Origin')), 'Content-Type': 'application/json' },
     });
   }
