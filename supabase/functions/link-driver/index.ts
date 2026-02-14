@@ -88,8 +88,8 @@ serve(async (req: Request) => {
       });
     }
 
-    // トークン有効期限チェック
-    if (driver.registration_token_expires_at && new Date(driver.registration_token_expires_at) < new Date()) {
+    // トークン有効期限チェック（NULLの場合も期限切れ扱い = 古いトークンを無効化）
+    if (!driver.registration_token_expires_at || new Date(driver.registration_token_expires_at) < new Date()) {
       return new Response(JSON.stringify({ message: '登録トークンの有効期限が切れています。管理者に再発行を依頼してください。' }), {
         status: 410, headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
       });
@@ -109,7 +109,8 @@ serve(async (req: Request) => {
     }
 
     // LINE User IDを紐付け + registration_token/expires_atをNULL化（使い捨て）
-    const { error: updateError } = await supabase
+    // レース条件防止: registration_token一致 + line_user_id IS NULLを条件に含める
+    const { data: updateResult, error: updateError } = await supabase
       .from('drivers')
       .update({
         line_user_id: lineUserId,
@@ -117,10 +118,17 @@ serve(async (req: Request) => {
         registration_token_expires_at: null,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', driver.id);
+      .eq('id', driver.id)
+      .eq('registration_token', registrationToken)
+      .is('line_user_id', null)
+      .select('id')
+      .single();
 
-    if (updateError) {
-      throw new Error(`紐付けに失敗しました: ${updateError.message}`);
+    if (updateError || !updateResult) {
+      // レース条件: 別リクエストが先にトークンを使用した場合
+      return new Response(JSON.stringify({ message: 'このトークンは既に使用されています。管理者に再発行を依頼してください。' }), {
+        status: 409, headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
+      });
     }
 
     return new Response(JSON.stringify({

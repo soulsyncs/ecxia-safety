@@ -253,7 +253,7 @@ serve(async (req: Request) => {
         const ALLOWED_MIME: Record<string, { ext: string; magic: number[] }> = {
           'image/jpeg': { ext: 'jpg', magic: [0xFF, 0xD8, 0xFF] },
           'image/png':  { ext: 'png', magic: [0x89, 0x50, 0x4E, 0x47] },
-          'image/webp': { ext: 'webp', magic: [0x52, 0x49, 0x46, 0x46] }, // "RIFF"
+          'image/webp': { ext: 'webp', magic: [0x52, 0x49, 0x46, 0x46] }, // "RIFF" (+ bytes 8-11 "WEBP" checked below)
         };
         const MAX_BASE64_LENGTH = 14_000_000; // ~10MB decoded
 
@@ -270,6 +270,10 @@ serve(async (req: Request) => {
           // マジックバイト検証（Content-Type偽装を防止）
           const magicMatch = allowed.magic.every((b, i) => bytes[i] === b);
           if (!magicMatch) continue;
+          // WebP追加検証: bytes 8-11が "WEBP" (0x57,0x45,0x42,0x50)であること
+          if (photo.mimeType === 'image/webp') {
+            if (bytes[8] !== 0x57 || bytes[9] !== 0x45 || bytes[10] !== 0x42 || bytes[11] !== 0x50) continue;
+          }
           const path = `${driverRow.organization_id}/${result.id}/${crypto.randomUUID()}.${allowed.ext}`;
           const { error: uploadError } = await supabase.storage.from('accident-photos').upload(path, bytes, {
             contentType: photo.mimeType,
