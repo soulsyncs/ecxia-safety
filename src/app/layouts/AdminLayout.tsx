@@ -5,6 +5,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth-context';
 import { authService } from '@/services';
+import { useDailySummary } from '@/hooks/use-dashboard';
 
 const baseNavItems = [
   { to: '/' as const, label: 'ダッシュボード', icon: LayoutDashboard },
@@ -16,7 +17,14 @@ const baseNavItems = [
 
 export function AdminLayout() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, organization } = useAuth();
+  const orgId = organization?.id ?? '';
+  const today = new Date().toISOString().split('T')[0]!;
+  const { data: summary } = useDailySummary(today, orgId);
+
+  const hasMissing = summary
+    ? summary.preWorkMissing.length > 0 || summary.inspectionMissing.length > 0 || summary.postWorkMissing.length > 0
+    : false;
 
   const navItems = [
     ...baseNavItems,
@@ -48,7 +56,12 @@ export function AdminLayout() {
               activeProps={{ className: 'active' }}
               activeOptions={{ exact: item.to === '/' }}
             >
-              <item.icon className="h-4 w-4" />
+              <div className="relative">
+                <item.icon className="h-4 w-4" />
+                {item.to === '/' && hasMissing && (
+                  <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-red-500 border border-[#0a3a2a]" />
+                )}
+              </div>
               {item.label}
             </Link>
           ))}

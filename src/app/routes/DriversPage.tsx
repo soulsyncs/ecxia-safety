@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Search, Pencil, Trash2, Link2 } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Link2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -117,7 +117,7 @@ export function DriversPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">ドライバー管理</h1>
-          <p className="text-muted-foreground">{drivers.length}名登録</p>
+          <p className="text-muted-foreground">ドライバーの登録・編集・LINE連携ができます</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -239,6 +239,15 @@ export function DriversPage() {
               })}
             </TableBody>
           </Table>
+          {filteredDrivers.length === 0 && drivers.length === 0 && (
+            <div className="text-center py-12 px-6">
+              <Users className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-700 mb-1">まだドライバーが登録されていません</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                右上の「新規登録」ボタンから、ドライバーの氏名と電話番号を登録しましょう。
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

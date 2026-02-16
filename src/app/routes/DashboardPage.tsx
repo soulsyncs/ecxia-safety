@@ -1,7 +1,12 @@
-import { Users, FileText, ClipboardCheck, AlertTriangle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link } from '@tanstack/react-router';
+import { Users, FileText, ClipboardCheck, AlertTriangle, CheckCircle2, Circle, X, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useDailySummary } from '@/hooks/use-dashboard';
+import { useDrivers } from '@/hooks/use-drivers';
+import { useVehicles } from '@/hooks/use-vehicles';
 import { useAuth } from '@/contexts/auth-context';
 import { isDemoMode } from '@/lib/supabase';
 
@@ -53,10 +58,148 @@ function StatCard({ title, icon: Icon, value, total, missing, color }: {
   );
 }
 
+/** ウェルカムガイド（初回のみ表示） */
+function WelcomeGuide({ userName, onDismiss }: { userName: string; onDismiss: () => void }) {
+  return (
+    <Card className="mb-6 border-[#50cb43]/30 bg-gradient-to-r from-[#eef6ed] to-white">
+      <CardContent className="pt-6">
+        <div className="flex items-start justify-between">
+          <div className="flex gap-3">
+            <Sparkles className="h-6 w-6 text-[#50cb43] mt-0.5 shrink-0" />
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">
+                ようこそ、{userName}さん！
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                ECXIA安全管理システムへの初回ログインありがとうございます。
+              </p>
+              <div className="mt-3 space-y-2 text-sm text-gray-700">
+                <p>このシステムでは、以下のことができます：</p>
+                <ul className="list-disc list-inside space-y-1 ml-1">
+                  <li>ドライバーの日報・点呼記録を一覧で確認</li>
+                  <li>未提出者をひと目で把握し、アラートを受け取る</li>
+                  <li>監査用のCSVデータをワンクリックでダウンロード</li>
+                </ul>
+              </div>
+              <p className="text-sm text-muted-foreground mt-3">
+                まずは下の「やることリスト」に沿って、初期設定を進めましょう。
+              </p>
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onDismiss} className="shrink-0">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** やることリスト（セットアップチェックリスト） */
+function SetupChecklist({ items }: { items: { label: string; done: boolean; href: string; description: string }[] }) {
+  const doneCount = items.filter(i => i.done).length;
+  const allDone = doneCount === items.length;
+
+  if (allDone) return null;
+
+  return (
+    <Card className="mb-6 border-amber-200">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">はじめに設定すること</CardTitle>
+          <Badge variant="outline" className="text-xs">
+            {doneCount} / {items.length} 完了
+          </Badge>
+        </div>
+        <div className="flex gap-1 mt-2">
+          {items.map((item, i) => (
+            <div
+              key={i}
+              className={`h-1.5 flex-1 rounded-full ${item.done ? 'bg-ecxia-green' : 'bg-gray-200'}`}
+            />
+          ))}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {items.map((item, i) => (
+          <Link
+            key={i}
+            to={item.href}
+            className={`flex items-start gap-3 p-3 rounded-lg transition-colors ${
+              item.done
+                ? 'bg-green-50 text-green-700'
+                : 'bg-amber-50 hover:bg-amber-100 text-amber-900'
+            }`}
+          >
+            {item.done ? (
+              <CheckCircle2 className="h-5 w-5 text-ecxia-green shrink-0 mt-0.5" />
+            ) : (
+              <Circle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+            )}
+            <div>
+              <p className={`text-sm font-medium ${item.done ? 'line-through' : ''}`}>
+                {item.label}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+            </div>
+          </Link>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function DashboardPage() {
-  const { organization } = useAuth();
+  const { user, organization } = useAuth();
+  const orgId = organization?.id ?? '';
   const today = new Date().toISOString().split('T')[0]!;
-  const { data: summary, isLoading } = useDailySummary(today, organization?.id ?? '');
+  const { data: summary, isLoading } = useDailySummary(today, orgId);
+  const { data: drivers = [] } = useDrivers(orgId);
+  const { data: vehicles = [] } = useVehicles(orgId);
+
+  // ウェルカムガイドの表示制御（localStorage）
+  const [showWelcome, setShowWelcome] = useState(false);
+  useEffect(() => {
+    const dismissed = localStorage.getItem('ecxia_welcome_dismissed');
+    if (!dismissed) setShowWelcome(true);
+  }, []);
+
+  const dismissWelcome = () => {
+    setShowWelcome(false);
+    localStorage.setItem('ecxia_welcome_dismissed', 'true');
+  };
+
+  // セットアップチェックリスト
+  const activeDrivers = drivers.filter(d => d.status === 'active');
+  const activeVehicles = vehicles.filter(v => v.status !== 'retired');
+  const linkedDrivers = activeDrivers.filter(d => d.lineUserId);
+
+  const setupItems = [
+    {
+      label: 'ドライバーを登録する',
+      done: activeDrivers.length > 0,
+      href: '/drivers',
+      description: activeDrivers.length > 0
+        ? `${activeDrivers.length}名が登録済み`
+        : 'ドライバー管理ページで、名前と電話番号を登録しましょう',
+    },
+    {
+      label: '車両を登録する',
+      done: activeVehicles.length > 0,
+      href: '/vehicles',
+      description: activeVehicles.length > 0
+        ? `${activeVehicles.length}台が登録済み`
+        : '車両管理ページで、ナンバープレートを登録しましょう',
+    },
+    {
+      label: 'ドライバーのLINE連携をする',
+      done: linkedDrivers.length > 0,
+      href: '/drivers',
+      description: linkedDrivers.length > 0
+        ? `${linkedDrivers.length}名が連携済み`
+        : 'ドライバー管理ページで「LINE連携」ボタンからQRコードを発行しましょう',
+    },
+  ];
 
   if (isLoading || !summary) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">読み込み中...</div>;
@@ -75,6 +218,14 @@ export function DashboardPage() {
           </Badge>
         )}
       </div>
+
+      {/* 1. ウェルカムガイド */}
+      {showWelcome && user && (
+        <WelcomeGuide userName={user.name} onDismiss={dismissWelcome} />
+      )}
+
+      {/* 2. やることリスト */}
+      <SetupChecklist items={setupItems} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card>
