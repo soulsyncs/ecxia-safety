@@ -1,10 +1,12 @@
 import { Outlet, Link, useRouter } from '@tanstack/react-router';
 import {
-  LayoutDashboard, Users, Truck, FileText, Download, LogOut,
+  LayoutDashboard, Users, Truck, FileText, Download, LogOut, ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/auth-context';
+import { authService } from '@/services';
 
-const navItems = [
+const baseNavItems = [
   { to: '/' as const, label: 'ダッシュボード', icon: LayoutDashboard },
   { to: '/reports' as const, label: '日報一覧', icon: FileText },
   { to: '/drivers' as const, label: 'ドライバー管理', icon: Users },
@@ -14,9 +16,17 @@ const navItems = [
 
 export function AdminLayout() {
   const router = useRouter();
+  const { user } = useAuth();
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('ecxia_logged_in');
+  const navItems = [
+    ...baseNavItems,
+    ...(user?.role === 'org_admin'
+      ? [{ to: '/admin-users' as const, label: 'スタッフ管理', icon: ShieldCheck }]
+      : []),
+  ];
+
+  const handleLogout = async () => {
+    await authService.logout();
     router.navigate({ to: '/login' });
   };
 

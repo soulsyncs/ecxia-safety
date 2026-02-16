@@ -2,7 +2,9 @@
 import type {
   Driver, Vehicle, PreWorkReport, PostWorkReport,
   DailyInspection, AccidentReport, DailySubmissionSummary,
+  AdminUser,
 } from '@/types/database';
+import type { CreateAdminInput } from '@/lib/validations';
 import {
   demoOrganization, demoDrivers, demoVehicles,
   demoPreWorkReports, demoPostWorkReports,
@@ -11,6 +13,7 @@ import {
 
 // ストア（ミュータブル配列）
 const store = {
+  adminUsers: [demoAdminUser] as AdminUser[],
   drivers: [...demoDrivers],
   vehicles: [...demoVehicles],
   preWorkReports: [...demoPreWorkReports],
@@ -35,6 +38,32 @@ export const authService = {
   async getCurrentUser() {
     await delay(100);
     return { user: demoAdminUser, organization: demoOrganization };
+  },
+};
+
+// --- Admin Users ---
+export const adminUserService = {
+  async list(): Promise<AdminUser[]> {
+    await delay();
+    return store.adminUsers;
+  },
+  async create(input: CreateAdminInput): Promise<AdminUser> {
+    await delay(500);
+    const admin: AdminUser = {
+      id: genId(),
+      organizationId: demoOrganization.id,
+      email: input.email,
+      name: input.name,
+      role: input.role,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    store.adminUsers.push(admin);
+    return admin;
+  },
+  remove(id: string): void {
+    const idx = store.adminUsers.findIndex(a => a.id === id);
+    if (idx !== -1) store.adminUsers.splice(idx, 1);
   },
 };
 

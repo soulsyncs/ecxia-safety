@@ -1,4 +1,5 @@
 export { loginSchema, type LoginInput } from './auth';
+export { createAdminSchema, type CreateAdminInput } from './admin-user';
 export { createDriverSchema, updateDriverSchema, type CreateDriverInput, type UpdateDriverInput } from './driver';
 export { createVehicleSchema, updateVehicleSchema, type CreateVehicleInput, type UpdateVehicleInput } from './vehicle';
 export { preWorkReportSchema, type PreWorkReportInput } from './pre-work-report';
