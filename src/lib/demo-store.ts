@@ -67,6 +67,21 @@ export const adminUserService = {
     const idx = store.adminUsers.findIndex(a => a.id === id);
     if (idx !== -1) store.adminUsers.splice(idx, 1);
   },
+  async generateLineToken(id: string): Promise<string> {
+    await delay(300);
+    const token = crypto.randomUUID();
+    const admin = store.adminUsers.find(a => a.id === id);
+    if (admin) admin.lineRegistrationToken = token;
+    return token;
+  },
+  async unlinkLine(id: string): Promise<void> {
+    await delay(300);
+    const admin = store.adminUsers.find(a => a.id === id);
+    if (admin) {
+      admin.lineUserId = null;
+      admin.lineRegistrationToken = null;
+    }
+  },
 };
 
 // --- Drivers ---

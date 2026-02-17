@@ -72,7 +72,7 @@ async function remove(id: string, organizationId: string): Promise<void> {
 /** LINE連携用トークンを生成 */
 async function generateLineToken(id: string, organizationId: string): Promise<string> {
   if (isDemoMode) {
-    return `demo-token-${id}`;
+    return demoAdminUserService.generateLineToken(id);
   }
 
   const token = crypto.randomUUID();
@@ -87,7 +87,10 @@ async function generateLineToken(id: string, organizationId: string): Promise<st
 
 /** LINE連携を解除 */
 async function unlinkLine(id: string, organizationId: string): Promise<void> {
-  if (isDemoMode) return;
+  if (isDemoMode) {
+    demoAdminUserService.unlinkLine(id);
+    return;
+  }
 
   const { error } = await supabase
     .from('admin_users')

@@ -117,13 +117,16 @@ serve(async (req: Request) => {
             .single();
 
           if (!adminError && admin) {
-            // トークン一致 → LINE User IDを紐付け、トークンを無効化
-            const { error: updateError } = await supabase
+            // トークン一致 → LINE User IDを紐付け、トークンを無効化（アトミック更新）
+            const { data: updateResult, error: updateError } = await supabase
               .from('admin_users')
               .update({ line_user_id: lineUserId, line_registration_token: null })
-              .eq('id', admin.id);
+              .eq('id', admin.id)
+              .eq('line_registration_token', text)
+              .select('id')
+              .single();
 
-            if (!updateError) {
+            if (!updateError && updateResult) {
               await replyMessage(event.replyToken, [{
                 type: 'text',
                 text: `${admin.name}さん、LINE連携が完了しました！\n\n今後、提出状況のサマリー通知がこのLINEに届きます。`,
