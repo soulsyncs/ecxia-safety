@@ -31,3 +31,25 @@ export function useRemoveAdminUser() {
     },
   });
 }
+
+export function useGenerateLineToken() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, organizationId }: { id: string; organizationId: string }) =>
+      adminUsersService.generateLineToken(id, organizationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+    },
+  });
+}
+
+export function useUnlinkAdminLine() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, organizationId }: { id: string; organizationId: string }) =>
+      adminUsersService.unlinkLine(id, organizationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+    },
+  });
+}

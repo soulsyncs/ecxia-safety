@@ -158,41 +158,60 @@ serve(async (req: Request) => {
           .in('driver_id', driverIds);
 
         const total = drivers.length;
-        const preCount = new Set((preSubmitted ?? []).map(r => r.driver_id)).size;
-        const inspCount = new Set((inspSubmitted ?? []).map(r => r.driver_id)).size;
+        const preSubmittedIds = new Set((preSubmitted ?? []).map(r => r.driver_id));
+        const inspSubmittedIds = new Set((inspSubmitted ?? []).map(r => r.driver_id));
+        const preCount = preSubmittedIds.size;
+        const inspCount = inspSubmittedIds.size;
 
         const preMissing = drivers
-          .filter(d => !new Set((preSubmitted ?? []).map(r => r.driver_id)).has(d.id))
+          .filter(d => !preSubmittedIds.has(d.id))
           .map(d => d.name);
         const inspMissing = drivers
-          .filter(d => !new Set((inspSubmitted ?? []).map(r => r.driver_id)).has(d.id))
+          .filter(d => !inspSubmittedIds.has(d.id))
           .map(d => d.name);
 
-        // 管理者ユーザーを取得（org_admin/manager）
+        // LINE連携済みの管理者を取得
         const { data: admins } = await supabase
           .from('admin_users')
-          .select('id, email, name')
-          .eq('organization_id', org.id);
+          .select('id, name, line_user_id')
+          .eq('organization_id', org.id)
+          .not('line_user_id', 'is', null);
+
+        if (!admins || admins.length === 0) {
+          console.log(`Admin summary for org ${org.id}: no LINE-linked admins, skipping`);
+          continue;
+        }
 
         // サマリーテキスト
-        let summary = `【${org.name}】本日の提出状況\n\n`;
-        summary += `業務前報告: ${preCount}/${total}名\n`;
+        let summary = `【${org.name}】本日の提出状況（${today}）\n\n`;
+        summary += `📋 業務前報告: ${preCount}/${total}名\n`;
         if (preMissing.length > 0) {
           summary += `  未提出: ${preMissing.join('、')}\n`;
         }
-        summary += `\n日常点検: ${inspCount}/${total}名\n`;
+        summary += `\n🔧 日常点検: ${inspCount}/${total}名\n`;
         if (inspMissing.length > 0) {
           summary += `  未提出: ${inspMissing.join('、')}\n`;
         }
 
         if (preMissing.length === 0 && inspMissing.length === 0) {
-          summary += '\n全員提出済みです。';
+          summary += '\n✅ 全員提出済みです。';
+        } else {
+          summary += `\n⚠️ 未提出者がいます。確認をお願いします。`;
         }
 
-        // TODO: 管理者へのLINE通知（管理者もLINE連携する場合）
-        // 現時点ではログ出力のみ
-        console.log(`Admin summary for org ${org.id}: pre=${preCount}/${total}, insp=${inspCount}/${total}, preMissing=${preMissing.length}, inspMissing=${inspMissing.length}`);
-        totalAlerts++;
+        // LINE連携済みの全管理者にプッシュ通知
+        for (const admin of admins) {
+          if (!admin.line_user_id) continue;
+          try {
+            await pushMessage(org.line_channel_access_token, admin.line_user_id, [{
+              type: 'text',
+              text: summary,
+            }]);
+            totalAlerts++;
+          } catch {
+            console.error(`Failed to send admin summary to admin ${admin.id}`);
+          }
+        }
       }
     }
 

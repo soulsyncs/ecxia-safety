@@ -103,9 +103,43 @@ serve(async (req: Request) => {
 
       // メッセージ受信
       if (event.type === 'message' && event.message?.type === 'text') {
-        const text = event.message.text?.toLowerCase() ?? '';
+        const text = (event.message.text ?? '').trim();
+        const textLower = text.toLowerCase();
+        const lineUserId = event.source?.userId;
 
-        if (text.includes('ヘルプ') || text === 'help') {
+        // 管理者LINE連携: 登録トークンによる紐付け
+        // トークンはUUID形式（8-4-4-4-12）→ 管理画面で生成されたもの
+        if (lineUserId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)) {
+          const { data: admin, error: adminError } = await supabase
+            .from('admin_users')
+            .select('id, name, line_registration_token')
+            .eq('line_registration_token', text)
+            .single();
+
+          if (!adminError && admin) {
+            // トークン一致 → LINE User IDを紐付け、トークンを無効化
+            const { error: updateError } = await supabase
+              .from('admin_users')
+              .update({ line_user_id: lineUserId, line_registration_token: null })
+              .eq('id', admin.id);
+
+            if (!updateError) {
+              await replyMessage(event.replyToken, [{
+                type: 'text',
+                text: `${admin.name}さん、LINE連携が完了しました！\n\n今後、提出状況のサマリー通知がこのLINEに届きます。`,
+              }]);
+            } else {
+              await replyMessage(event.replyToken, [{
+                type: 'text',
+                text: 'LINE連携の処理中にエラーが発生しました。管理画面から再度お試しください。',
+              }]);
+            }
+            continue;
+          }
+          // トークンが見つからない場合はドライバーの登録トークンかもしれないのでフォールスルー
+        }
+
+        if (textLower.includes('ヘルプ') || textLower === 'help') {
           await replyMessage(event.replyToken, [{
             type: 'text',
             text: 'ECXIA安全管理システム\n\n画面下部のメニューから以下の操作ができます：\n・出勤 → 業務前報告\n・点検 → 日常点検\n・退勤 → 業務後報告\n・事故 → 事故報告',

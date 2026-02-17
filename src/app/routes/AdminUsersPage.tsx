@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Shield, ShieldCheck, Trash2, Mail, Copy, Check, Eye, EyeOff } from 'lucide-react';
+import { Plus, Shield, ShieldCheck, Trash2, Mail, Copy, Check, Eye, EyeOff, MessageCircle, Link2, Unlink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
-import { useAdminUsers, useCreateAdminUser, useRemoveAdminUser } from '@/hooks/use-admin-users';
+import { useAdminUsers, useCreateAdminUser, useRemoveAdminUser, useGenerateLineToken, useUnlinkAdminLine } from '@/hooks/use-admin-users';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from '@tanstack/react-router';
 import { createAdminSchema, type CreateAdminInput } from '@/lib/validations';
@@ -27,10 +27,15 @@ export function AdminUsersPage() {
   const { data: admins = [], isLoading } = useAdminUsers(orgId);
   const createAdmin = useCreateAdminUser();
   const removeAdmin = useRemoveAdminUser();
+  const generateLineToken = useGenerateLineToken();
+  const unlinkLine = useUnlinkAdminLine();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [createdEmail, setCreatedEmail] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [lineTokenDialogAdmin, setLineTokenDialogAdmin] = useState<{ id: string; name: string } | null>(null);
+  const [generatedToken, setGeneratedToken] = useState<string | null>(null);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors }, watch } = useForm<CreateAdminInput>({
     resolver: zodResolver(createAdminSchema),
@@ -69,6 +74,32 @@ export function AdminUsersPage() {
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : '削除に失敗しました');
     }
+  };
+
+  const handleGenerateLineToken = async (adminId: string, adminName: string) => {
+    if (!organization) return;
+    try {
+      const token = await generateLineToken.mutateAsync({ id: adminId, organizationId: organization.id });
+      setGeneratedToken(token);
+      setLineTokenDialogAdmin({ id: adminId, name: adminName });
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'トークンの生成に失敗しました');
+    }
+  };
+
+  const handleUnlinkLine = async (adminId: string) => {
+    if (!organization) return;
+    try {
+      await unlinkLine.mutateAsync({ id: adminId, organizationId: organization.id });
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'LINE連携の解除に失敗しました');
+    }
+  };
+
+  const handleCopyToken = (token: string) => {
+    navigator.clipboard.writeText(token);
+    setTokenCopied(true);
+    setTimeout(() => setTokenCopied(false), 2000);
   };
 
   const handleCopyCredentials = (email: string) => {
@@ -208,6 +239,7 @@ export function AdminUsersPage() {
                 <TableHead>氏名</TableHead>
                 <TableHead>メールアドレス</TableHead>
                 <TableHead>権限</TableHead>
+                <TableHead>LINE通知</TableHead>
                 <TableHead>登録日</TableHead>
                 {isOrgAdmin && <TableHead>操作</TableHead>}
               </TableRow>
@@ -239,6 +271,48 @@ export function AdminUsersPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant={role.variant}>{role.label}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {admin.lineUserId ? (
+                        <div className="flex items-center gap-1">
+                          <Badge variant="default" className="bg-green-600 text-xs">
+                            <MessageCircle className="h-3 w-3 mr-1" />連携済み
+                          </Badge>
+                          {isOrgAdmin && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                  <Unlink className="h-3 w-3 text-muted-foreground" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>LINE連携を解除しますか？</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    {admin.name}さんへのLINEサマリー通知が届かなくなります。再度連携するには新しいトークンの生成が必要です。
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleUnlinkLine(admin.id)}>解除する</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
+                      ) : isOrgAdmin ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => handleGenerateLineToken(admin.id, admin.name)}
+                          disabled={generateLineToken.isPending}
+                        >
+                          <Link2 className="h-3 w-3 mr-1" />LINE連携
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">未連携</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm">
                       {new Date(admin.createdAt).toLocaleDateString('ja-JP')}
@@ -275,7 +349,7 @@ export function AdminUsersPage() {
               })}
               {admins.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={isOrgAdmin ? 5 : 4} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={isOrgAdmin ? 6 : 5} className="text-center text-muted-foreground py-8">
                     管理スタッフが登録されていません
                   </TableCell>
                 </TableRow>
@@ -284,6 +358,43 @@ export function AdminUsersPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* LINE連携トークンダイアログ */}
+      <Dialog open={!!lineTokenDialogAdmin} onOpenChange={(open) => { if (!open) { setLineTokenDialogAdmin(null); setGeneratedToken(null); setTokenCopied(false); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>LINE連携トークン</DialogTitle>
+            <DialogDescription>
+              {lineTokenDialogAdmin?.name}さんのLINE連携用トークンです。
+              このトークンをECXIA安全管理のLINE公式アカウントにメッセージとして送信してください。
+            </DialogDescription>
+          </DialogHeader>
+          {generatedToken && (
+            <div className="space-y-4">
+              <div className="bg-muted p-4 rounded-lg text-center">
+                <p className="font-mono text-sm break-all select-all">{generatedToken}</p>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => handleCopyToken(generatedToken)}
+              >
+                {tokenCopied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+                {tokenCopied ? 'コピーしました' : 'トークンをコピー'}
+              </Button>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">手順:</p>
+                <ol className="list-decimal list-inside space-y-1">
+                  <li>ECXIA安全管理のLINE公式アカウントを友だち追加</li>
+                  <li>上のトークンをコピー</li>
+                  <li>LINE公式アカウントのトーク画面にペーストして送信</li>
+                  <li>「LINE連携が完了しました」と返信が届けば成功</li>
+                </ol>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* 使い方ガイド */}
       <Card className="mt-6">
@@ -302,6 +413,10 @@ export function AdminUsersPage() {
           <div className="flex gap-3">
             <span className="bg-muted rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shrink-0">3</span>
             <p>コピーした情報をLINEやメールでスタッフに送ってください。スタッフはその情報でログインできます。</p>
+          </div>
+          <div className="flex gap-3">
+            <span className="bg-muted rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shrink-0">4</span>
+            <p>LINE通知を受け取るには「LINE連携」ボタンからトークンを生成し、LINE公式アカウントに送信してください。</p>
           </div>
         </CardContent>
       </Card>

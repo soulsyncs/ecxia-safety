@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from '@tanstack/react-router';
 import { Bell, Clock, Save, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/auth-context';

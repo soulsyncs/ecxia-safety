@@ -69,4 +69,32 @@ async function remove(id: string, organizationId: string): Promise<void> {
   if (error) handleSupabaseError(error);
 }
 
-export const adminUsersService = { list, create, remove };
+/** LINE連携用トークンを生成 */
+async function generateLineToken(id: string, organizationId: string): Promise<string> {
+  if (isDemoMode) {
+    return `demo-token-${id}`;
+  }
+
+  const token = crypto.randomUUID();
+  const { error } = await supabase
+    .from('admin_users')
+    .update({ line_registration_token: token })
+    .eq('id', id)
+    .eq('organization_id', organizationId);
+  if (error) handleSupabaseError(error);
+  return token;
+}
+
+/** LINE連携を解除 */
+async function unlinkLine(id: string, organizationId: string): Promise<void> {
+  if (isDemoMode) return;
+
+  const { error } = await supabase
+    .from('admin_users')
+    .update({ line_user_id: null, line_registration_token: null })
+    .eq('id', id)
+    .eq('organization_id', organizationId);
+  if (error) handleSupabaseError(error);
+}
+
+export const adminUsersService = { list, create, remove, generateLineToken, unlinkLine };

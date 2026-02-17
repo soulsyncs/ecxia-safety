@@ -58,6 +58,8 @@ export interface AdminUser {
   email: string;
   name: string;
   role: AdminRole;
+  lineUserId: string | null;
+  lineRegistrationToken: string | null;
   createdAt: string;
   updatedAt: string;
 }

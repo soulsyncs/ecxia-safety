@@ -55,6 +55,8 @@ export const adminUserService = {
       email: input.email,
       name: input.name,
       role: input.role,
+      lineUserId: null,
+      lineRegistrationToken: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

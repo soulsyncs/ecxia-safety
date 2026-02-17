@@ -187,6 +187,8 @@ export const demoAdminUser: AdminUser = {
   email: 'admin@ecxia.co.jp',
   name: '田中 一郎',
   role: 'org_admin',
+  lineUserId: null,
+  lineRegistrationToken: null,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: isoNow(),
 };
