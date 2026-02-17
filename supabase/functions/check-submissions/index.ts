@@ -39,10 +39,14 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 serve(async (req: Request) => {
-  // Cron / 手動実行のみ許可（CRON_SECRET検証 - timing-safe）
+  // Cron / 手動実行のみ許可（CRON_SECRET または SERVICE_ROLE_KEY で認証）
   const authHeader = req.headers.get('Authorization');
   const cronSecret = Deno.env.get('CRON_SECRET');
-  if (!authHeader || !cronSecret || !timingSafeEqual(authHeader, `Bearer ${cronSecret}`)) {
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const isAuthorized =
+    (authHeader && cronSecret && timingSafeEqual(authHeader, `Bearer ${cronSecret}`)) ||
+    (authHeader && serviceRoleKey && timingSafeEqual(authHeader, `Bearer ${serviceRoleKey}`));
+  if (!isAuthorized) {
     return new Response('Unauthorized', { status: 401 });
   }
 
