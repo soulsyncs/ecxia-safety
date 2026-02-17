@@ -231,6 +231,24 @@ serve(async (req: Request) => {
         });
       }
 
+      // 事故報告の二重送信防止（5分以内の同一ドライバーからの重複をチェック）
+      if (type === 'accident') {
+        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const { data: recent } = await supabase
+          .from('accident_reports')
+          .select('id')
+          .eq('driver_id', driverRow.id)
+          .eq('organization_id', driverRow.organization_id)
+          .gte('created_at', fiveMinAgo)
+          .limit(1);
+        if (recent && recent.length > 0) {
+          return new Response(JSON.stringify({ message: '直前に事故報告が送信されています。重複送信を防ぐため、5分間お待ちください。' }), {
+            status: 409,
+            headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
       // ホワイトリストでサニタイズ（不明フィールドは除去）
       const sanitized = sanitizePayload(type, data ?? {});
 
@@ -246,6 +264,22 @@ serve(async (req: Request) => {
       }
 
       const result = await insertReport(table, safePayload);
+
+      // 監査ログ記録（PIIなし）
+      try {
+        await supabase.from('event_logs').insert({
+          organization_id: driverRow.organization_id,
+          actor_type: 'driver',
+          actor_id: driverRow.id,
+          action: 'submit_report',
+          resource_type: table,
+          resource_id: result.id ?? null,
+          details: { reportType: type, submittedVia: 'liff' },
+          ip_address: clientIp,
+        });
+      } catch {
+        // 監査ログ失敗は報告送信を妨げない
+      }
 
       // 事故報告の写真アップロード処理
       if (type === 'accident' && Array.isArray(body.photos) && body.photos.length > 0 && result.id) {

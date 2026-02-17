@@ -12,7 +12,8 @@
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(self)" },
         { "key": "X-DNS-Prefetch-Control", "value": "on" },
-        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" }
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' https://static.line-scdn.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://dirbmretnocymuttrlrc.supabase.co https://profile.line-scdn.net; connect-src 'self' https://dirbmretnocymuttrlrc.supabase.co https://api.line.me https://liff.line.me; frame-src https://liff.line.me; font-src 'self' data:; object-src 'none'; base-uri 'self'" }
       ]
     }
   ],
