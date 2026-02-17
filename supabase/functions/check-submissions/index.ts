@@ -63,7 +63,7 @@ serve(async (req: Request) => {
     // LINE連携済みの全組織を取得
     const { data: orgs } = await supabase
       .from('organizations')
-      .select('id, name, line_channel_access_token')
+      .select('id, name, line_channel_access_token, settings')
       .not('line_channel_access_token', 'is', null);
 
     if (!orgs || orgs.length === 0) {
@@ -76,6 +76,14 @@ serve(async (req: Request) => {
 
     for (const org of orgs) {
       if (!org.line_channel_access_token) continue;
+
+      // 通知設定チェック — 該当する通知タイプがOFFならスキップ
+      const notification = (org.settings as Record<string, unknown>)?.notification as Record<string, { enabled: boolean }> | undefined;
+      if (notification) {
+        if (checkType === 'pre_work' && !notification.preWorkAlert?.enabled) continue;
+        if (checkType === 'post_work' && !notification.postWorkAlert?.enabled) continue;
+        if (checkType === 'admin_summary' && !notification.adminSummary?.enabled) continue;
+      }
 
       // 稼働中ドライバー一覧
       const { data: drivers } = await supabase

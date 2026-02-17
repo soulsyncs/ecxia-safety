@@ -9,6 +9,7 @@ import { VehiclesPage } from '@/app/routes/VehiclesPage';
 import { ReportsPage } from '@/app/routes/ReportsPage';
 import { ExportPage } from '@/app/routes/ExportPage';
 import { AdminUsersPage } from '@/app/routes/AdminUsersPage';
+import { NotificationSettingsPage } from '@/app/routes/NotificationSettingsPage';
 import { PreWorkFormPage } from '@/liff/pages/PreWorkFormPage';
 import { InspectionFormPage } from '@/liff/pages/InspectionFormPage';
 import { PostWorkFormPage } from '@/liff/pages/PostWorkFormPage';
@@ -79,6 +80,12 @@ const adminUsersRoute = createRoute({
   component: AdminUsersPage,
 });
 
+const notificationSettingsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/notification-settings',
+  component: NotificationSettingsPage,
+});
+
 // LIFF layout
 const liffRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -127,6 +134,7 @@ const routeTree = rootRoute.addChildren([
     reportsRoute,
     exportRoute,
     adminUsersRoute,
+    notificationSettingsRoute,
   ]),
   registerRoute,
   liffRoute.addChildren([

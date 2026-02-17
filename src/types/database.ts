@@ -330,6 +330,21 @@ export interface EventLog {
   createdAt: string;
 }
 
+/** 通知設定（organizations.settings内に格納） */
+export interface NotificationSettings {
+  morningReminder: { enabled: boolean; time: string };   // 朝のリマインド
+  preWorkAlert: { enabled: boolean; time: string };      // 業務前未提出アラート
+  postWorkAlert: { enabled: boolean; time: string };     // 業務後未提出アラート
+  adminSummary: { enabled: boolean; time: string };      // 管理者サマリー
+}
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  morningReminder: { enabled: false, time: '08:00' },
+  preWorkAlert: { enabled: false, time: '09:30' },
+  postWorkAlert: { enabled: false, time: '19:00' },
+  adminSummary: { enabled: false, time: '10:00' },
+};
+
 // --- フォーム入力型（LIFF用） ---
 
 export interface PreWorkReportInput {

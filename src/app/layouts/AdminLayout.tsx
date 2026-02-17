@@ -1,6 +1,6 @@
 import { Outlet, Link, useRouter } from '@tanstack/react-router';
 import {
-  LayoutDashboard, Users, Truck, FileText, Download, LogOut, ShieldCheck,
+  LayoutDashboard, Users, Truck, FileText, Download, LogOut, ShieldCheck, Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth-context';
@@ -29,7 +29,10 @@ export function AdminLayout() {
   const navItems = [
     ...baseNavItems,
     ...(user?.role === 'org_admin'
-      ? [{ to: '/admin-users' as const, label: 'スタッフ管理', icon: ShieldCheck }]
+      ? [
+          { to: '/notification-settings' as const, label: 'LINE自動配信', icon: Bell },
+          { to: '/admin-users' as const, label: 'スタッフ管理', icon: ShieldCheck },
+        ]
       : []),
   ];
 

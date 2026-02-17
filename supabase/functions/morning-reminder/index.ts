@@ -51,7 +51,7 @@ serve(async (req: Request) => {
     // LINE連携済みの全組織を取得
     const { data: orgs } = await supabase
       .from('organizations')
-      .select('id, name, line_channel_access_token')
+      .select('id, name, line_channel_access_token, settings')
       .not('line_channel_access_token', 'is', null);
 
     if (!orgs || orgs.length === 0) {
@@ -64,6 +64,10 @@ serve(async (req: Request) => {
 
     for (const org of orgs) {
       if (!org.line_channel_access_token) continue;
+
+      // 通知設定チェック — morningReminderがOFFならスキップ
+      const notification = (org.settings as Record<string, unknown>)?.notification as Record<string, { enabled: boolean }> | undefined;
+      if (notification && !notification.morningReminder?.enabled) continue;
 
       // 稼働中かつLINE連携済みのドライバーを取得
       const { data: drivers } = await supabase
