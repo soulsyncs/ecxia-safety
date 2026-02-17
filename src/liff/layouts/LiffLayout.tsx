@@ -1,11 +1,13 @@
 import { Outlet, Link } from '@tanstack/react-router';
-import { Truck, ClipboardCheck, FileText, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Truck, ClipboardCheck, FileText, AlertTriangle, RefreshCw, CalendarDays, Phone } from 'lucide-react';
 import { useLiffAuth } from '@/liff/hooks/use-liff-auth';
 
 const liffNavItems = [
   { to: '/liff/pre-work' as const, label: '出勤', icon: Truck },
   { to: '/liff/inspection' as const, label: '点検', icon: ClipboardCheck },
   { to: '/liff/post-work' as const, label: '退勤', icon: FileText },
+  { to: '/liff/shift-request' as const, label: 'シフト', icon: CalendarDays },
+  { to: '/liff/emergency-request' as const, label: '緊急', icon: Phone },
   { to: '/liff/accident' as const, label: '事故', icon: AlertTriangle },
 ];
 
@@ -125,7 +127,7 @@ export function LiffLayout() {
       </div>
 
       {/* ナビゲーション — ECXIAグリーン */}
-      <nav className="bg-white border-t grid grid-cols-4">
+      <nav className="bg-white border-t grid grid-cols-6">
         {liffNavItems.map((item) => (
           <Link
             key={item.to}
