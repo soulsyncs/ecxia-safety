@@ -83,9 +83,28 @@ serve(async (req: Request) => {
 
       if (!drivers || drivers.length === 0) continue;
 
-      // 各ドライバーにリマインド送信
+      // JSTで当日日付を取得
+      const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+      const today = jstNow.toISOString().split('T')[0]!;
+
+      // シフトテーブルから休みのドライバーを取得（day_off / absent のドライバーを除外）
+      const driverIds = drivers.map(d => d.id);
+      const { data: shifts } = await supabase
+        .from('shifts')
+        .select('driver_id, status')
+        .eq('shift_date', today)
+        .in('driver_id', driverIds);
+
+      const dayOffIds = new Set(
+        (shifts ?? [])
+          .filter(s => s.status === 'day_off' || s.status === 'absent')
+          .map(s => s.driver_id)
+      );
+
+      // 各ドライバーにリマインド送信（休みのドライバーはスキップ）
       for (const driver of drivers) {
         if (!driver.line_user_id) continue;
+        if (dayOffIds.has(driver.id)) continue; // 休み・欠勤はスキップ
         try {
           await pushMessage(org.line_channel_access_token, driver.line_user_id, [{
             type: 'text',

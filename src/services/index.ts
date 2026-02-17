@@ -5,3 +5,5 @@ export { vehiclesService } from './vehicles.service';
 export { reportsService } from './reports.service';
 export { dashboardService } from './dashboard.service';
 export { notificationSettingsService } from './notification-settings.service';
+export { shiftsService } from './shifts.service';
+export { emergencyService } from './emergency.service';

@@ -21,6 +21,9 @@ export type GuidanceType = 'initial' | 'accident' | 'senior' | 'regular';
 export type AptitudeTestType = 'initial' | 'periodic' | 'specific' | 'senior';
 export type TrainingType = 'initial' | 'periodic';
 export type BroadcastTargetStatus = 'pending' | 'sent' | 'failed';
+export type ShiftStatus = 'working' | 'day_off' | 'half_am' | 'half_pm' | 'absent' | 'pending';
+export type ShiftSubmittedBy = 'driver' | 'admin' | 'system';
+export type EmergencyReportType = 'absent' | 'vehicle_trouble' | 'accident' | 'family' | 'other';
 
 /** 休憩記録（JSONB） */
 export interface RestPeriod {
@@ -330,6 +333,36 @@ export interface EventLog {
   details: Record<string, unknown> | null;
   ipAddress: string | null;
   createdAt: string;
+}
+
+/** 3.16 shifts（シフト管理） */
+export interface Shift {
+  id: string;
+  organizationId: string;
+  driverId: string;
+  shiftDate: string;
+  status: ShiftStatus;
+  note: string | null;
+  submittedBy: ShiftSubmittedBy;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 3.17 emergency_reports（緊急連絡） */
+export interface EmergencyReport {
+  id: string;
+  organizationId: string;
+  driverId: string;
+  reportDate: string;
+  reportType: EmergencyReportType;
+  reason: string | null;
+  vehicleId: string | null;
+  isResolved: boolean;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  submittedVia: SubmittedVia;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** 通知設定（organizations.settings内に格納） */

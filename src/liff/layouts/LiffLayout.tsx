@@ -1,5 +1,5 @@
 import { Outlet, Link } from '@tanstack/react-router';
-import { Truck, ClipboardCheck, FileText, AlertTriangle } from 'lucide-react';
+import { Truck, ClipboardCheck, FileText, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useLiffAuth } from '@/liff/hooks/use-liff-auth';
 
 const liffNavItems = [
@@ -8,6 +8,58 @@ const liffNavItems = [
   { to: '/liff/post-work' as const, label: '退勤', icon: FileText },
   { to: '/liff/accident' as const, label: '事故', icon: AlertTriangle },
 ];
+
+/** エラーメッセージに応じたユーザー向けガイドを返す */
+function getErrorGuide(error: string): { title: string; steps: string[]; note?: string } {
+  if (error.includes('LINE認証') || error.includes('IDトークン') || error.includes('認証が必要')) {
+    return {
+      title: 'LINE認証に問題があります',
+      steps: [
+        'LINEアプリの画面下部メニューからアクセスしてください',
+        'ブラウザからは利用できません',
+        'それでも解決しない場合は、LINEアプリを再起動してください',
+      ],
+    };
+  }
+  if (error.includes('ドライバー') && (error.includes('見つかり') || error.includes('登録'))) {
+    return {
+      title: 'ドライバー登録が必要です',
+      steps: [
+        '管理者から受け取った登録URL（QRコード）を開いてください',
+        'まだ登録URLを受け取っていない場合は、管理者にお問い合わせください',
+      ],
+      note: '登録URL: 管理画面の「ドライバー」ページから発行されます',
+    };
+  }
+  if (error.includes('友だち') || error.includes('ブロック')) {
+    return {
+      title: 'LINE公式アカウントの友だち追加が必要です',
+      steps: [
+        'ECXIA安全管理のLINE公式アカウントを友だち追加してください',
+        '以前ブロックした場合は、ブロック解除してください',
+        '友だち追加後、もう一度メニューからアクセスしてください',
+      ],
+    };
+  }
+  if (error.includes('ネットワーク') || error.includes('fetch') || error.includes('Failed')) {
+    return {
+      title: '通信エラーが発生しました',
+      steps: [
+        'インターネット接続を確認してください',
+        '電波の良い場所で再度お試しください',
+        '問題が続く場合は、管理者にお問い合わせください',
+      ],
+    };
+  }
+  return {
+    title: 'エラーが発生しました',
+    steps: [
+      'LINEアプリを再起動してください',
+      'メニューから再度アクセスしてください',
+      '問題が続く場合は、下記のエラー内容を管理者に伝えてください',
+    ],
+  };
+}
 
 export function LiffLayout() {
   const { isLoading, error } = useLiffAuth();
@@ -24,13 +76,33 @@ export function LiffLayout() {
   }
 
   if (error) {
+    const guide = getErrorGuide(error);
     return (
       <div className="min-h-screen bg-[#f8faf8] flex items-center justify-center p-4">
-        <div className="text-center max-w-sm">
+        <div className="text-center max-w-sm bg-white rounded-2xl shadow-lg p-6">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-3" />
-          <h2 className="text-lg font-bold mb-2">エラー</h2>
-          <p className="text-sm text-muted-foreground mb-4">{error}</p>
-          <p className="text-xs text-muted-foreground">LINEアプリからアクセスしてください</p>
+          <h2 className="text-lg font-bold mb-3">{guide.title}</h2>
+          <div className="text-left mb-4">
+            <p className="text-sm font-medium mb-2">対処方法：</p>
+            <ol className="text-sm text-muted-foreground space-y-1.5 list-decimal list-inside">
+              {guide.steps.map((step, i) => (
+                <li key={i}>{step}</li>
+              ))}
+            </ol>
+          </div>
+          {guide.note && (
+            <p className="text-xs text-muted-foreground bg-gray-50 rounded p-2 mb-4">{guide.note}</p>
+          )}
+          <div className="border-t pt-3 mt-3">
+            <p className="text-xs text-muted-foreground mb-2">エラー詳細: {error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center gap-1 text-xs text-[#49b93d] font-medium"
+            >
+              <RefreshCw className="h-3 w-3" />
+              再読み込み
+            </button>
+          </div>
         </div>
       </div>
     );

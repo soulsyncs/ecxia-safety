@@ -2,7 +2,7 @@
 import type {
   Driver, Vehicle, PreWorkReport, PostWorkReport,
   DailyInspection, AccidentReport, DailySubmissionSummary,
-  AdminUser,
+  AdminUser, Shift, ShiftStatus, EmergencyReport, EmergencyReportType,
 } from '@/types/database';
 import type { CreateAdminInput } from '@/lib/validations';
 import {
@@ -20,6 +20,8 @@ const store = {
   postWorkReports: [...demoPostWorkReports],
   dailyInspections: [...demoDailyInspections],
   accidentReports: [...demoAccidentReports],
+  shifts: [] as Shift[],
+  emergencyReports: [] as EmergencyReport[],
 };
 
 // 遅延シミュレーション（リアルなUX）
@@ -186,6 +188,67 @@ export const reportService = {
     await delay();
     store.accidentReports.push(input);
     return input;
+  },
+};
+
+// --- Shifts ---
+export const shiftService = {
+  async listByMonth(year: number, month: number): Promise<Shift[]> {
+    await delay();
+    const prefix = `${year}-${String(month).padStart(2, '0')}`;
+    return store.shifts.filter(s => s.shiftDate.startsWith(prefix));
+  },
+  async listByDate(date: string): Promise<Shift[]> {
+    await delay();
+    return store.shifts.filter(s => s.shiftDate === date);
+  },
+  async upsert(driverId: string, date: string, status: ShiftStatus, submittedBy: string = 'admin', note?: string): Promise<Shift> {
+    await delay();
+    const idx = store.shifts.findIndex(s => s.driverId === driverId && s.shiftDate === date);
+    if (idx !== -1) {
+      store.shifts[idx] = { ...store.shifts[idx]!, status, note: note ?? null, submittedBy: submittedBy as Shift['submittedBy'], updatedAt: new Date().toISOString() };
+      return store.shifts[idx]!;
+    }
+    const shift: Shift = {
+      id: genId(), organizationId: demoOrganization.id, driverId, shiftDate: date,
+      status, note: note ?? null, submittedBy: submittedBy as Shift['submittedBy'],
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    };
+    store.shifts.push(shift);
+    return shift;
+  },
+  remove(id: string): void {
+    const idx = store.shifts.findIndex(s => s.id === id);
+    if (idx !== -1) store.shifts.splice(idx, 1);
+  },
+};
+
+// --- Emergency Reports ---
+export const emergencyService = {
+  async list(startDate?: string, endDate?: string): Promise<EmergencyReport[]> {
+    await delay();
+    let result = store.emergencyReports;
+    if (startDate) result = result.filter(r => r.reportDate >= startDate);
+    if (endDate) result = result.filter(r => r.reportDate <= endDate);
+    return result;
+  },
+  async create(driverId: string, reportType: EmergencyReportType, reason?: string, vehicleId?: string): Promise<EmergencyReport> {
+    await delay();
+    const today = new Date().toISOString().split('T')[0]!;
+    const report: EmergencyReport = {
+      id: genId(), organizationId: demoOrganization.id, driverId, reportDate: today,
+      reportType, reason: reason ?? null, vehicleId: vehicleId ?? null,
+      isResolved: false, resolvedBy: null, resolvedAt: null, submittedVia: 'web',
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    };
+    store.emergencyReports.push(report);
+    // シフトも自動で「欠勤」に更新
+    await shiftService.upsert(driverId, today, 'absent', 'system', `緊急: ${reportType}`);
+    return report;
+  },
+  resolve(id: string, resolvedByAdminId: string): void {
+    const r = store.emergencyReports.find(e => e.id === id);
+    if (r) { r.isResolved = true; r.resolvedBy = resolvedByAdminId; r.resolvedAt = new Date().toISOString(); }
   },
 };
 

@@ -1,6 +1,7 @@
 import { Outlet, Link, useRouter } from '@tanstack/react-router';
 import {
   LayoutDashboard, Users, Truck, FileText, Download, LogOut, ShieldCheck, Bell,
+  CalendarDays, AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth-context';
@@ -12,6 +13,8 @@ const baseNavItems = [
   { to: '/reports' as const, label: '日報一覧', icon: FileText },
   { to: '/drivers' as const, label: 'ドライバー管理', icon: Users },
   { to: '/vehicles' as const, label: '車両管理', icon: Truck },
+  { to: '/shifts' as const, label: 'シフト管理', icon: CalendarDays },
+  { to: '/emergency' as const, label: '緊急連絡', icon: AlertTriangle },
   { to: '/export' as const, label: 'データエクスポート', icon: Download },
 ];
 

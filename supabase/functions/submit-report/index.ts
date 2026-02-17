@@ -191,7 +191,18 @@ serve(async (req: Request) => {
     // ドライバー検索
     const driverRow = await findDriverByLineUserId(lineUserId);
     if (!driverRow) {
-      return new Response(JSON.stringify({ message: '登録されていないドライバーです' }), {
+      // LINE連携済みだが非アクティブなドライバーかチェック
+      const { data: inactiveDriver } = await supabase
+        .from('drivers')
+        .select('id, status')
+        .eq('line_user_id', lineUserId)
+        .single();
+
+      const message = inactiveDriver
+        ? 'ドライバーアカウントが無効になっています。管理者にお問い合わせください。'
+        : 'ドライバー登録がされていません。管理者から受け取った登録URLを開いて、LINE連携を完了してください。';
+
+      return new Response(JSON.stringify({ message }), {
         status: 403,
         headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
       });

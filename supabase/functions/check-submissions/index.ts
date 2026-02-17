@@ -101,16 +101,33 @@ serve(async (req: Request) => {
 
       const driverIds = drivers.map(d => d.id);
 
+      // シフトテーブルから当日のシフト状況を取得
+      const { data: shifts } = await supabase
+        .from('shifts')
+        .select('driver_id, status')
+        .eq('shift_date', today)
+        .in('driver_id', driverIds);
+
+      const dayOffIds = new Set(
+        (shifts ?? [])
+          .filter(s => s.status === 'day_off' || s.status === 'absent')
+          .map(s => s.driver_id)
+      );
+
+      // 出勤予定ドライバー（休み・欠勤を除外）
+      const workingDrivers = drivers.filter(d => !dayOffIds.has(d.id));
+
       if (checkType === 'pre_work') {
-        // 業務前報告の未提出者チェック
+        // 業務前報告の未提出者チェック（出勤予定者のみ）
+        const workingIds = workingDrivers.map(d => d.id);
         const { data: submitted } = await supabase
           .from('pre_work_reports')
           .select('driver_id')
           .eq('report_date', today)
-          .in('driver_id', driverIds);
+          .in('driver_id', workingIds);
 
         const submittedIds = new Set((submitted ?? []).map(r => r.driver_id));
-        const missing = drivers.filter(d => !submittedIds.has(d.id));
+        const missing = workingDrivers.filter(d => !submittedIds.has(d.id));
 
         for (const driver of missing) {
           if (!driver.line_user_id) continue;
@@ -126,14 +143,27 @@ serve(async (req: Request) => {
         }
       } else if (checkType === 'post_work') {
         // 業務後報告の未提出者チェック
-        const { data: submitted } = await supabase
+        // 業務前報告を提出した人 = 実際に出勤した人のみ対象
+        const workingIds = workingDrivers.map(d => d.id);
+        const { data: preSubmitted } = await supabase
+          .from('pre_work_reports')
+          .select('driver_id')
+          .eq('report_date', today)
+          .in('driver_id', workingIds);
+
+        const preSubmittedIds = new Set((preSubmitted ?? []).map(r => r.driver_id));
+        // 業務前を出した人のうち、業務後が未提出の人
+        const actuallyWorked = workingDrivers.filter(d => preSubmittedIds.has(d.id));
+        const actuallyWorkedIds = actuallyWorked.map(d => d.id);
+
+        const { data: postSubmitted } = await supabase
           .from('post_work_reports')
           .select('driver_id')
           .eq('report_date', today)
-          .in('driver_id', driverIds);
+          .in('driver_id', actuallyWorkedIds);
 
-        const submittedIds = new Set((submitted ?? []).map(r => r.driver_id));
-        const missing = drivers.filter(d => !submittedIds.has(d.id));
+        const postSubmittedIds = new Set((postSubmitted ?? []).map(r => r.driver_id));
+        const missing = actuallyWorked.filter(d => !postSubmittedIds.has(d.id));
 
         for (const driver of missing) {
           if (!driver.line_user_id) continue;
@@ -148,29 +178,40 @@ serve(async (req: Request) => {
           }
         }
       } else if (checkType === 'admin_summary') {
-        // 管理者サマリー通知
+        // 管理者サマリー通知（シフト状況を含む）
+        const workingIds = workingDrivers.map(d => d.id);
+        const dayOffCount = dayOffIds.size;
+
         const { data: preSubmitted } = await supabase
           .from('pre_work_reports')
           .select('driver_id')
           .eq('report_date', today)
-          .in('driver_id', driverIds);
+          .in('driver_id', workingIds);
 
         const { data: inspSubmitted } = await supabase
           .from('daily_inspections')
           .select('driver_id')
           .eq('inspection_date', today)
+          .in('driver_id', workingIds);
+
+        // 未対応の緊急連絡を取得
+        const { data: emergencies } = await supabase
+          .from('emergency_reports')
+          .select('driver_id, report_type')
+          .eq('report_date', today)
+          .eq('is_resolved', false)
           .in('driver_id', driverIds);
 
-        const total = drivers.length;
+        const workingTotal = workingDrivers.length;
         const preSubmittedIds = new Set((preSubmitted ?? []).map(r => r.driver_id));
         const inspSubmittedIds = new Set((inspSubmitted ?? []).map(r => r.driver_id));
         const preCount = preSubmittedIds.size;
         const inspCount = inspSubmittedIds.size;
 
-        const preMissing = drivers
+        const preMissing = workingDrivers
           .filter(d => !preSubmittedIds.has(d.id))
           .map(d => d.name);
-        const inspMissing = drivers
+        const inspMissing = workingDrivers
           .filter(d => !inspSubmittedIds.has(d.id))
           .map(d => d.name);
 
@@ -188,17 +229,23 @@ serve(async (req: Request) => {
 
         // サマリーテキスト
         let summary = `【${org.name}】本日の提出状況（${today}）\n\n`;
-        summary += `📋 業務前報告: ${preCount}/${total}名\n`;
+        summary += `👥 出勤予定: ${workingTotal}名 / 休み: ${dayOffCount}名\n\n`;
+        summary += `📋 業務前報告: ${preCount}/${workingTotal}名\n`;
         if (preMissing.length > 0) {
           summary += `  未提出: ${preMissing.join('、')}\n`;
         }
-        summary += `\n🔧 日常点検: ${inspCount}/${total}名\n`;
+        summary += `\n🔧 日常点検: ${inspCount}/${workingTotal}名\n`;
         if (inspMissing.length > 0) {
           summary += `  未提出: ${inspMissing.join('、')}\n`;
         }
 
+        // 緊急連絡があれば追加
+        if (emergencies && emergencies.length > 0) {
+          summary += `\n🚨 未対応の緊急連絡: ${emergencies.length}件\n`;
+        }
+
         if (preMissing.length === 0 && inspMissing.length === 0) {
-          summary += '\n✅ 全員提出済みです。';
+          summary += '\n✅ 出勤予定者は全員提出済みです。';
         } else {
           summary += `\n⚠️ 未提出者がいます。確認をお願いします。`;
         }
